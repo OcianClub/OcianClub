@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, Pressable, Image, ActivityIndicator, Alert, FlatList } from 'react-native';
 import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { styles } from './equipesStyles';
+import { styles } from '../../../../src/styles/equipesStyles';
 import { Header } from '@/src/components/Header';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, Pressable, Image, ActivityIndicator } from 'react-native';
-import { styles } from './organizarPartidasStyles';
+import { styles } from '../../../src/styles/organizarPartidasStyles';
 import { Header } from '@/src/components/Header';
 import { colors } from '@/src/theme/colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

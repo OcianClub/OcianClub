@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
-import { styles } from './dadosPessoaisStyles';
+import { styles } from '../../../../src/styles/dadosPessoaisStyles';
 import { Header } from '@/src/components/Header';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';

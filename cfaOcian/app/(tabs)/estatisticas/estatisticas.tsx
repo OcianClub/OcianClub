@@ -7,7 +7,7 @@ import PagerView from 'react-native-pager-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { obterPerfisJogadores, Jogador } from '@/src/services/mlService';
-import { styles } from './estatisticasStyles';
+import { styles } from '../../../src/styles/estatisticasStyles';
 import { Header } from '@/src/components/Header';
 import { BASE_URL } from '@/src/services/api';
 import { colors } from '@/src/theme/colors';

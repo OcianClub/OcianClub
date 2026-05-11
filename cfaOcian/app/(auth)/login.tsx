@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/src/services/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { styles } from './loginStyles'
+import { styles } from '../../src/styles/loginStyles'
 
 export default function Login() {
   const router = useRouter();

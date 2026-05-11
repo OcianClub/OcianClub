@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image, ScrollView, Modal, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
-import { styles } from './jogosStyles';
+import { styles } from '../../../src/styles/jogosStyles';
 import { Header } from '@/src/components/Header';
 import { colors } from '@/src/theme/colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

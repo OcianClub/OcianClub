@@ -1,5 +1,5 @@
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { styles } from './indexStyles';
+import { styles } from '../../src/styles/indexStyles';
 import { Header } from '@/src/components/Header';
 import { colors } from '@/src/theme/colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

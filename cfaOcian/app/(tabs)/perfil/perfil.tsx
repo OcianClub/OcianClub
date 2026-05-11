@@ -1,6 +1,6 @@
 import { Modal, View, Text, TouchableOpacity, Pressable } from "react-native";
 import { useState, useEffect } from 'react';
-import { styles } from "./perfilStyles";
+import { styles } from "../../../src/styles/perfilStyles";
 import { Header } from '@/src/components/Header';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';

@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { BASE_URL } from '@/src/services/api'; 
 import { colors } from '@/src/theme/colors'; 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { styles } from './cadastroStyles'
+import { styles } from '../../src/styles/cadastroStyles'
 
 export default function Cadastro() {
   const router = useRouter();

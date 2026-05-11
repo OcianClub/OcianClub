@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Header } from '@/src/components/Header';
 import { colors } from '@/src/theme/colors';
-import { styles } from './placarStyles';
+import { styles } from '../../../src/styles/placarStyles';
 import PagerView from 'react-native-pager-view';
 import { CarrosselSubs, SUBS_INICIACAO, SUBS_BASE } from '@/src/components/CarrosselSubs';
 
