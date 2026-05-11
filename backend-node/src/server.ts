@@ -1,4 +1,3 @@
-// src/server.ts
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -19,7 +18,9 @@ app.use(express.json());
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo_super_seguro_ocian';
 const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://localhost:8000';
 
+// ==========================================
 // 1. AUTENTICAÇÃO E USUÁRIOS
+// ==========================================
 
 app.post('/auth/registrar', async (req, res) => {
     const { email, senha, nome, role } = req.body;
@@ -87,9 +88,9 @@ app.delete('/usuarios/me', async (req, res) => {
   }
 });
 
+// ==========================================
 // 2. CADASTROS E BUSCAS
-
-// Substitua as rotas POST, PATCH e GET de /times por estas:
+// ==========================================
 
 app.post('/times', async (req, res) => {
   const { nome, escudo, categorias_ids } = req.body;
@@ -119,7 +120,7 @@ app.patch('/times/:id', async (req, res) => {
         nome, 
         escudo,
         categorias: categorias_ids ? {
-          set: categorias_ids.map((id: number) => ({ id })) // Atualiza os subs marcados
+          set: categorias_ids.map((id: number) => ({ id })) 
         } : undefined
       },
       include: { categorias: true }
@@ -134,7 +135,7 @@ app.get('/times', async (req, res) => {
   try {
     const times = await prisma.time.findMany({ 
       orderBy: { nome: 'asc' },
-      include: { categorias: true } // <-- Traz os subs pro frontend saber!
+      include: { categorias: true } 
     });
     res.json(times);
   } catch (error) {
@@ -174,7 +175,7 @@ app.delete('/competicoes/:id', async (req, res) => {
 });
 
 app.post('/jogadores', async (req, res) =>{
-  const { nome, cpf, dtNasc, posicao, numCamisa} =req.body;
+  const { nome, cpf, dtNasc, posicao, numCamisa} = req.body;
 
   if (!nome || !cpf || !dtNasc){
     return res.status(400).json({ error: 'Nome, CPF e data de nascimento são obrigatórios' });
@@ -239,7 +240,7 @@ app.post('/jogadores', async (req, res) =>{
         nome,
         cpf,
         dtNasc: new Date(dtNasc),
-        posicao: posicao ||  "Não definida",
+        posicao: posicao ||  "Ala", // Valor default para futsal
         numCamisa: numCamisa ? Number(numCamisa) : null,
         categoria_id: categoria.id,
         perfil_ml: ""
@@ -264,38 +265,54 @@ app.get('/jogadores', async (req, res) => {
 });
 
 app.get('/jogadores/perfis', async (req, res) => {
-    try {
-        const jogadores = await prisma.jogador.findMany({
-            include: { eventos: true }
-        });
+  const { categoria_id } = req.query;
+  try {
+    const jogadores = await prisma.jogador.findMany({
+      where: categoria_id ? { categoria_id: Number(categoria_id) } : undefined,
+      include: {
+        eventos: true,
+        categoria: true,
+        escalacoes: true // Conta os jogos disputados a partir das escalações
+      },
+      orderBy: { nota_geral: 'desc' },
+    });
 
-        const formatados = jogadores.map(j => {
-            const stats = j.eventos.reduce((acc: any, ev) => {
-                acc[ev.tipo] = (acc[ev.tipo] || 0) + 1;
-                return acc;
-            }, {});
+    const formatados = jogadores.map(j => {
+      const stats = j.eventos.reduce((acc: any, ev) => {
+        acc[ev.tipo] = (acc[ev.tipo] || 0) + 1;
+        return acc;
+      }, {});
 
-            return {
-                id_jogador: j.id,
-                nome: j.nome,
-                posicao: j.posicao,
-                perfil_ml: j.perfil_ml || 'Versátil',
-                time: "CFA Ocian",
-                jogos_disputados: [...new Set(j.eventos.map(e => e.partida_id))].length,
-                gols: stats['GOL'] || 0,
-                assistencias: stats['ASSISTENCIA'] || 0,
-                desarmes: stats['DESARME'] || 0,
-                cartoes_amarelos: stats['CARTAO_AMARELO'] || 0,
-                cartoes_vermelhos: stats['CARTAO_VERMELHO'] || 0,
-                faltas_cometidas: stats['FALTA'] || 0
-            };
-        });
+      const jogos = j.escalacoes ? j.escalacoes.length : 0;
 
-        res.json(formatados);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Erro ao carregar perfis de estatísticas' });
-    }
+      return {
+        id_jogador:       j.id,
+        nome:             j.nome,
+        posicao:          j.posicao,
+        numCamisa:        j.numCamisa,
+        dtNasc:           j.dtNasc,
+        perfil_ml:        j.perfil_ml || 'Sem dados',
+        scores_ml:        j.scores_ml,
+        nota_geral:       j.nota_geral ?? 0,
+        categoria:        j.categoria.nome,
+        categoria_tipo:   j.categoria.tipo,
+        categoria_id:     j.categoria_id,
+        time:             'CFA Ocian',
+        jogos_disputados: jogos,
+        gols:             stats['GOL']             || 0,
+        assistencias:     stats['ASSISTENCIA']     || 0,
+        defesas:          stats['DEFESA']          || 0, // <-- ATUALIZADO AQUI: Substituiu DESARME
+        cartoes_amarelos: stats['CARTAO_AMARELO']  || 0,
+        cartoes_vermelhos:stats['CARTAO_VERMELHO'] || 0,
+        faltas_cometidas: stats['FALTA']           || 0,
+      };
+    });
+
+    res.json(formatados);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao carregar perfis' });
+  }
 });
 
 app.post('/competicoes', async (req, res) => {
@@ -373,9 +390,9 @@ app.get('/partidas', async (req, res) => {
   }
 });
 
-
+// ==========================================
 // 3. O JOGO E EVENTOS
-
+// ==========================================
 
 app.get('/jogadores/:id/estatisticas', async (req, res) => {
     const jogadorId = parseInt(req.params.id);
@@ -395,7 +412,6 @@ app.get('/jogadores/:id/estatisticas', async (req, res) => {
 
 app.post('/partidas/:id/eventos', async (req, res) => {
     const partidaId = parseInt(req.params.id);
-    // CORREÇÃO: time_id inserido conforme schema novo
     const { jogador_id, time_id, tipo, minuto } = req.body;
     try {
         const evento = await prisma.evento.create({
@@ -447,43 +463,64 @@ app.patch('/partidas/:id/status', async (req, res) => {
     }
 });
 
-
+// ==========================================
 // 4. INTEGRAÇÃO COM IA
-
+// ==========================================
 
 async function processarMachineLearning() {
-    console.log("Coletando dados para IA...");
-    const eventos = await prisma.evento.groupBy({
-        by: ['jogador_id', 'tipo'],
-        _count: { tipo: true }
-    });
-
-    const mapJogadores = new Map<number, any>();
-    for (const ev of eventos) {
-        // Ignora eventos que não são do Ocian (onde jogador_id é null)
-        if (ev.jogador_id === null) continue;
-
-        if (!mapJogadores.has(ev.jogador_id)) {
-            mapJogadores.set(ev.jogador_id, { jogador_id: ev.jogador_id, GOL: 0, ASSISTENCIA: 0, DESARME: 0, CARTAO_AMARELO: 0, CARTAO_VERMELHO: 0 });
-        }
-        const dados = mapJogadores.get(ev.jogador_id);
-        dados[ev.tipo] = ev._count.tipo;
+  const jogadores = await prisma.jogador.findMany({
+    include: { 
+      eventos: true,
+      escalacoes: true // Fundamental para contabilizar a quantidade correta de jogos
     }
+  });
 
-    const payload = Array.from(mapJogadores.values());
-    if(payload.length < 3) return;
+  const payload = jogadores
+    .map(j => {
+      const stats = j.eventos.reduce((acc: any, ev) => {
+        acc[ev.tipo] = (acc[ev.tipo] || 0) + 1;
+        return acc;
+      }, {});
 
-    try {
-        const resposta = await axios.post(`${PYTHON_AI_URL}/internal/ml/treinar-perfis`, payload);
-        for (const perfil of resposta.data) {
-            await prisma.jogador.update({
-                where: { id: perfil.jogador_id },
-                data: { perfil_ml: perfil.perfil_ml }
-            });
-        }
-    } catch (error) {
-        console.error("Falha ao comunicar com IA.");
+      // O jogador só vai pra IA se tiver sido escalado (jogado) ao menos 1 vez
+      const jogos = j.escalacoes ? j.escalacoes.length : 0;
+      if (jogos === 0) return null;
+
+      return {
+        jogador_id: j.id,
+        GOL:            stats['GOL']            || 0,
+        ASSISTENCIA:    stats['ASSISTENCIA']    || 0,
+        DEFESA:         stats['DEFESA']         || 0, // <-- ATUALIZADO AQUI: Substituiu DESARME
+        CARTAO_AMARELO: stats['CARTAO_AMARELO'] || 0,
+        CARTAO_VERMELHO:stats['CARTAO_VERMELHO']|| 0,
+        FALTA:          stats['FALTA']          || 0,
+        jogos_disputados: jogos,
+      };
+    })
+    .filter(Boolean);
+
+  // K-Means não funciona sem no mínimo 3 pontos no gráfico
+  if (payload.length < 3) {
+    console.log("Scout IA: Jogadores insuficientes para calcular perfis.");
+    return;
+  }
+
+  try {
+    const resposta = await axios.post(`${PYTHON_AI_URL}/internal/ml/treinar-perfis`, payload);
+    for (const resultado of resposta.data) {
+      await prisma.jogador.update({
+        where: { id: resultado.jogador_id },
+        data: {
+          perfil_ml:  resultado.perfil_ml,
+          scores_ml:  resultado.scores,
+          nota_geral: resultado.nota_geral,
+        },
+      });
     }
+    console.log(`Scout IA: ${resposta.data.length} jogadores processados e atualizados.`);
+  } catch (error) {
+    console.error("Falha ao comunicar com microsserviço de IA Python.");
+  }
 }
 
 const PORT = process.env.PORT || 3000;

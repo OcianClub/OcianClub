@@ -6,6 +6,13 @@ async function getToken() {
   return await SecureStore.getItemAsync('userToken');
 }
 
+export async function fetchJogadoresPerfis(categoria_id?: number): Promise<any[]> {
+  const query = categoria_id ? `?categoria_id=${categoria_id}` : '';
+  const res = await fetch(`${BASE_URL}/jogadores/perfis${query}`);
+  if (!res.ok) throw new Error('Erro ao buscar perfis');
+  return res.json();
+}
+
 export async function fetchTimes() {
   const res = await fetch(`${BASE_URL}/times`);
   if (!res.ok) throw new Error('Erro ao buscar times');

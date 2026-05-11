@@ -75,7 +75,10 @@ model Jogador {
   dtNasc        DateTime  @db.Date
   numCamisa     Int?      
   posicao       String
+
   perfil_ml     String?
+  scores_ml     Json?
+  nota_geral    Float?    
   
   categoria_id  Int 
   categoria     Categoria @relation(fields: [categoria_id], references: [id])
@@ -146,10 +149,11 @@ model Evento {
   @@index([partida_id])
 }
 
+// ATUALIZADO AQUI: Removido DESARME e adicionado DEFESA
 enum TipoEvento {
   GOL
   ASSISTENCIA
-  DESARME
+  DEFESA
   CARTAO_AMARELO
   CARTAO_VERMELHO
   FALTA

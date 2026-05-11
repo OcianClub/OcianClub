@@ -25,6 +25,13 @@ export const SUBS_INICIACAO = [
   { id: '4', title: 'SUB-10' },
 ];
 
+export const SUBS = [
+  { id: '1', title: 'SUB 12' },
+  { id: '2', title: 'SUB 14' },
+  { id: '3', title: 'SUB 16' },
+  { id: '4', title: 'SUB 18' },
+];
+
 export const SUBS_BASE = [
   { id: '5', title: 'SUB-12' },
   { id: '6', title: 'SUB-14' },
