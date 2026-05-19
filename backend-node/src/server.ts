@@ -374,6 +374,35 @@ app.post('/partidas', async (req, res) => {
   }
 });
 
+app.post('/partidas', async (req, res) => {
+    const { competicao_id, categoria_id, rodada, data, horario /* ... */ } = req.body;
+    const dataFormatada = new Date(`${data}T00:00:00Z`);
+
+    // 🛑 TRAVA 1: Regra da Rodada
+    if (rodada) {
+        const rodadaDuplicada = await prisma.partida.findFirst({
+            where: { competicao_id, categoria_id, rodada: Number(rodada) }
+        });
+        if (rodadaDuplicada) {
+            return res.status(400).json({ error: "Esta categoria já tem um jogo nesta rodada." });
+        }
+    }
+
+    // 🛑 TRAVA 2: Regra do Choque de Horário
+    const choqueHorario = await prisma.partida.findFirst({
+        where: { categoria_id, data: dataFormatada, horario }
+    });
+    if (choqueHorario) {
+        return res.status(400).json({ error: "Conflito de agenda! A categoria já tem jogo neste horário." });
+    }
+
+    // 🟢 TUDO CERTO, PODE SALVAR
+    const novaPartida = await prisma.partida.create({
+        data: { /* ... */ }
+    });
+    return res.status(201).json(novaPartida);
+});
+
 app.get('/categorias', async (req, res) => {
   try {
     const categorias = await prisma.categoria.findMany({ orderBy: { nome: 'asc' } });

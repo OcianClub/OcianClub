@@ -123,16 +123,18 @@ model Partida {
   visitante_id   Int
   visitante      Time          @relation("Visitante", fields: [visitante_id], references: [id])
 
-  // Nomenclaturas originais mantidas — o frontend usa esses nomes.
+  // Nomenclaturas originais mantidas — o frontend usa esses nomes.m,lk,l
   // Use emCasa para saber qual lado é o Ocian.
   gols_mandante  Int           @default(0)
   gols_visitante Int           @default(0)
 
-  data           DateTime
-  horario        String?       // "19:30"
-  local          String?
-  emCasa         Boolean       @default(true) // true = Ocian é o mandante
-  status         StatusPartida @default(AGENDADA)
+  horario         String?       // "19:30"
+  data            DateTime      @db.Date
+  local           String?
+  rodada          Int?
+  grupo           String?
+  emCasa          Boolean       @default(true) // true = Ocian é o mandante
+  status          StatusPartida @default(AGENDADA)       
 
   categoria_id   Int
   categoria      Categoria     @relation(fields: [categoria_id], references: [id])
@@ -142,7 +144,7 @@ model Partida {
 
   jogadores_escalonados EscalacaoPartida[]
   eventos               Evento[]
-
+  @@unique([competicao_id, categoria_id, rodada])
   @@index([data])
   @@index([categoria_id])
   @@index([competicao_id])
