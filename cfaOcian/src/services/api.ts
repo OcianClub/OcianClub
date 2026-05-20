@@ -78,6 +78,50 @@ export async function fetchJogadores() {
   return res.json();
 }
 
+export async function criarJogador(dados: {
+  nome: string; cpf: string; dtNasc: string; posicao: string; numCamisa?: number;
+}): Promise<any> {
+  const res = await fetch(`${BASE_URL}/jogadores`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dados),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Erro ao criar jogador');
+  return json;
+}
+
+export async function atualizarJogador(id: number, dados: any) {
+  const res = await fetch(`${BASE_URL}/jogadores/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dados),
+  });
+  if (!res.ok) {
+    // Tenta ler o erro em JSON. Se for HTML, devolve vazio e cai no throw genérico
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Erro ao atualizar jogador');
+  }
+  return res.json();
+}
+
+export async function deletarJogador(id: number) {
+  const res = await fetch(`${BASE_URL}/jogadores/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Erro ao deletar jogador');
+  }
+  return res.json();
+}
+
+export async function fetchPerfilJogador(id: number): Promise<any> {
+  const res = await fetch(`${BASE_URL}/jogadores/perfis?categoria_id=0`);
+  // Busca perfis e filtra pelo id — reutiliza endpoint existente
+  if (!res.ok) throw new Error('Erro ao buscar perfil');
+  const todos = await res.json();
+  return todos.find((j: any) => j.id_jogador === id) ?? null;
+}
+
 export async function criarCompeticao(dados: { nome: string; ano: number }) {
   const res = await fetch(`${BASE_URL}/competicoes`, {
     method: 'POST',

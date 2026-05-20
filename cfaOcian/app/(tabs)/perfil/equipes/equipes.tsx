@@ -6,10 +6,12 @@ import { Header } from '@/src/components/Header';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 import * as ImagePicker from 'expo-image-picker';
+import ElencoSub from '@/src/components/ElencoSub';
 import {
   fetchTimes, fetchCompeticoes, fetchCategorias, fetchJogadores, fetchPartidas,
   criarTime, atualizarTime, deletarTime,
-  criarCompeticao, atualizarCompeticao, deletarCompeticao, fetchJogadoresPorCompeticao, salvarElencoCompeticao
+  criarCompeticao, atualizarCompeticao, deletarCompeticao,
+  fetchJogadoresPorCompeticao, salvarElencoCompeticao
 } from '@/src/services/api';
 
 interface Categoria { id: number; nome: string; }
@@ -76,16 +78,18 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
   const [categoriaFormId, setCategoriaFormId] = useState<number | null>(null);
   const [tipoForm, setTipoForm] = useState<'INICIACAO' | 'BASE'>('INICIACAO');
 
+  // ── ESTADO DA TELA DE ELENCO DO SUB ──
+  const [elencoSubVisivel, setElencoSubVisivel] = useState(false);
+  const [categoriaElenco, setCategoriaElenco]   = useState<Categoria | null>(null);
+
   // ── ESTADOS DO WIZARD DE CAMPEONATOS ──
   const [wizardVisivel, setWizardVisivel] = useState(false);
   const [wizardStep, setWizardStep] = useState<'INFO' | 'SUBS' | 'ELENCO' | 'JOGOS'>('INFO');
   const [wizardSubAtivo, setWizardSubAtivo] = useState<Categoria | null>(null);
-  const wizardSubRef = React.useRef<Categoria | null>(null);
   const [elencoSelecionado, setElencoSelecionado] = useState<Record<number, number[]>>({});
-  const [carregandoElenco, setCarregandoElenco] = useState(false);
 
   const carregarDados = useCallback(async (silencioso = false) => {
-    if (!silencioso) setCarregando(true);
+  if (!silencioso) setCarregando(true);
     try {
       const [t, c, cat, jog, p] = await Promise.all([
         fetchTimes(), fetchCompeticoes(), fetchCategorias(), fetchJogadores(), fetchPartidas()
@@ -95,9 +99,9 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
     } catch (e) {
       console.error(e);
     } finally {
-      if (!silencioso) setCarregando(false);
-    }
-  }, []);
+    if (!silencioso) setCarregando(false);
+  }
+}, []);
 
   useFocusEffect(useCallback(() => { carregarDados(); }, [carregarDados]));
 
@@ -125,26 +129,20 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
     setNomeForm(comp?.nome || '');
     setAnoForm(comp ? String(comp.ano) : String(new Date().getFullYear()));
     setTipoForm(comp?.tipo || 'INICIACAO');
+    setWizardStep('INFO');
     setWizardVisivel(true);
-
     if (comp) {
       try {
-        const jogadoresInscritos: Jogador[] = await fetchJogadoresPorCompeticao(comp.id);
-        const elencoInicial: Record<number, number[]> = {};
-        jogadoresInscritos.forEach(j => {
-          if (!elencoInicial[j.categoria_id]) elencoInicial[j.categoria_id] = [];
-          elencoInicial[j.categoria_id].push(j.id);
+        const jogadoresDaComp = await fetchJogadoresPorCompeticao(comp.id);
+        const mapa: Record<number, number[]> = {};
+        jogadoresDaComp.forEach((j: { id: number; categoria_id: number }) => {
+          if (!mapa[j.categoria_id]) mapa[j.categoria_id] = [];
+          mapa[j.categoria_id].push(j.id);
         });
-        setElencoSelecionado(elencoInicial);
-        setWizardStep(jogadoresInscritos.length > 0 ? 'SUBS' : 'INFO');
-      } catch (e) {
-        console.error('Erro ao carregar elenco:', e);
-        setElencoSelecionado({});
-        setWizardStep('INFO');
-      }
+        setElencoSelecionado(mapa);
+      } catch { setElencoSelecionado({}); }
     } else {
       setElencoSelecionado({});
-      setWizardStep('INFO');
     }
   };
 
@@ -163,8 +161,8 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
         comp = await criarCompeticao(dados);
       }
       setItemSelecionado(comp);
-      setWizardStep('SUBS');
-      carregarDados(true);
+      setWizardStep('SUBS'); // Avança o passo
+      carregarDados();
     } catch (err: any) {
       Alert.alert('Erro', err.message);
     } finally {
@@ -173,7 +171,6 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
   };
 
   const abrirSelecaoElenco = (sub: Categoria) => {
-    wizardSubRef.current = sub; // síncrono — disponível imediatamente no render
     setWizardSubAtivo(sub);
     setWizardStep('ELENCO');
   };
@@ -244,7 +241,7 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
       </View>
       <View style={styles.gridCategorias}>
         {categoriasOcian.map(cat => (
-          <TouchableOpacity key={cat.id} style={styles.cardCategoriaOcian} onPress={() => { setItemSelecionado(cat); setModalElenco(true); }}>
+          <TouchableOpacity key={cat.id} style={styles.cardCategoriaOcian} onPress={() => { setCategoriaElenco(cat); setElencoSubVisivel(true); }}>
             <View style={styles.iconCircleOcian}><MaterialCommunityIcons name="shield-star" size={32} color={colors.primary} /></View>
             <Text style={styles.catOcianNome}>{cat.nome}</Text>
             <Text style={styles.catOcianBadgeTxt}>{jogadores.filter(j => j.categoria_id === cat.id).length} atletas</Text>
@@ -308,6 +305,18 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
       </View>
     );
   };
+
+  // Tela do elenco: ocupa o lugar da tela principal enquanto visível
+  if (elencoSubVisivel && categoriaElenco) {
+    return (
+      <ElencoSub
+        categoria={categoriaElenco}
+        jogadores={jogadores.filter(j => Number(j.categoria_id) === Number(categoriaElenco.id))}
+        onFechar={() => setElencoSubVisivel(false)}
+        onRecarregar={() => carregarDados(true)}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -430,27 +439,29 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
         <Pressable style={styles.modalOverlay} onPress={() => setWizardVisivel(false)}>
           <Pressable style={[styles.modalCard, { maxHeight: '90%' }]}>
             
-            {/* Header do Wizard com botão voltar contextual */}
+            {/* Header do Wizard com seta voltar */}
             <View style={styles.modalHeader}>
-              {wizardStep !== 'INFO' ? (
-                <TouchableOpacity onPress={() => {
-                  if (wizardStep === 'SUBS') setWizardStep('INFO');
+              <TouchableOpacity
+                onPress={() => {
+                  if (wizardStep === 'INFO') setWizardVisivel(false);
+                  else if (wizardStep === 'SUBS') setWizardStep('INFO');
                   else if (wizardStep === 'ELENCO') setWizardStep('SUBS');
                   else if (wizardStep === 'JOGOS') setWizardStep('SUBS');
-                }} style={{ padding: 4 }}>
-                  <MaterialCommunityIcons name="arrow-left" size={22} color={colors.text} />
-                </TouchableOpacity>
-              ) : (
-                <View style={{ width: 30 }} />
-              )}
+                }}
+                style={{ padding: 4 }}
+              >
+                <MaterialCommunityIcons
+                  name={wizardStep === 'INFO' ? 'close' : 'arrow-left'}
+                  size={24}
+                  color={colors.text}
+                />
+              </TouchableOpacity>
               <Text style={styles.modalTitulo}>
                 {wizardStep === 'INFO' ? 'Dados do Torneio' :
                  wizardStep === 'SUBS' ? 'Escalar Categorias' :
-                 wizardStep === 'ELENCO' ? `Súmula: ${(wizardSubAtivo ?? wizardSubRef.current)?.nome}` : 'Tabela de Jogos'}
+                 wizardStep === 'ELENCO' ? `Súmula: ${wizardSubAtivo?.nome}` : 'Tabela de Jogos'}
               </Text>
-              <TouchableOpacity onPress={() => setWizardVisivel(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
+              <View style={{ width: 32 }} />
             </View>
             <View style={styles.wizardProgress}>
               {['INFO', 'SUBS', 'JOGOS'].map((step, index) => (
@@ -514,64 +525,45 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
             )}
 
             {/* CONTEÚDO: PASSO 3 - CHECKLIST DO ELENCO */}
-            {wizardStep === 'ELENCO' && (() => {
-              const subAtivo = wizardSubAtivo ?? wizardSubRef.current;
-              if (!subAtivo) return null;
-              const jogadoresDosub = jogadores.filter(j => Number(j.categoria_id) === Number(subAtivo.id));
+            {wizardStep === 'ELENCO' && wizardSubAtivo && (() => {
+              const jogadoresDoCat = jogadores.filter(j => Number(j.categoria_id) === Number(wizardSubAtivo.id));
               return (
                 <View style={{ minHeight: 300 }}>
                   <Text style={[styles.modalSubtitulo, { marginBottom: 12 }]}>
-                    Marque quem vai pra súmula oficial:
+                    {jogadoresDoCat.length} atleta{jogadoresDoCat.length !== 1 ? 's' : ''} no {wizardSubAtivo.nome}
                   </Text>
-                  {jogadoresDosub.length === 0 ? (
-                    <EmptyState icone="account-group-outline" mensagem={`Nenhum atleta no ${subAtivo.nome}.`} />
+                  {jogadoresDoCat.length === 0 ? (
+                    <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                      <MaterialCommunityIcons name="account-off-outline" size={44} color="#333" />
+                      <Text style={{ color: '#555', marginTop: 8, textAlign: 'center' }}>
+                        Nenhum atleta cadastrado neste sub.
+                      </Text>
+                    </View>
                   ) : (
-                    <ScrollView style={{ maxHeight: 320 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                      {jogadoresDosub.map(item => {
-                        const selecionado = !!(elencoSelecionado[subAtivo.id]?.includes(item.id));
-                        return (
-                          <TouchableOpacity
-                            key={item.id.toString()}
-                            style={[styles.cardJogadorModal, selecionado && { borderColor: colors.primary, backgroundColor: colors.primary + '11' }]}
-                            onPress={() => toggleJogadorElenco(item.id)}
-                            activeOpacity={0.7}
-                          >
-                            <MaterialCommunityIcons
-                              name={selecionado ? "checkbox-marked" : "checkbox-blank-outline"}
-                              size={24}
-                              color={selecionado ? colors.primary : colors.text_secondary}
-                            />
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                              <Text style={styles.jogadorNome}>{item.nome}</Text>
-                              <Text style={styles.jogadorPosicao}>{item.posicao} • #{item.numCamisa}</Text>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
+                    jogadoresDoCat.map(item => {
+                      const selecionado = !!(elencoSelecionado[wizardSubAtivo.id]?.includes(item.id));
+                      return (
+                        <TouchableOpacity
+                          key={item.id.toString()}
+                          style={[styles.cardJogadorModal, selecionado && { borderColor: colors.primary, backgroundColor: colors.primary + '11' }]}
+                          onPress={() => toggleJogadorElenco(item.id)}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons
+                            name={selecionado ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                            size={24}
+                            color={selecionado ? colors.primary : colors.text_secondary}
+                          />
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.jogadorNome}>{item.nome}</Text>
+                            <Text style={styles.jogadorPosicao}>{item.posicao} • #{item.numCamisa ?? '—'}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
                   )}
-                  <TouchableOpacity
-                    style={[styles.btnSalvar, { marginTop: 12 }]}
-                    disabled={carregandoElenco}
-                    onPress={async () => {
-                      if (itemSelecionado && 'ano' in itemSelecionado) {
-                        setCarregandoElenco(true);
-                        try {
-                          const todosIds = Object.values(elencoSelecionado).flat() as number[];
-                          await salvarElencoCompeticao(itemSelecionado.id, todosIds);
-                        } catch (e: any) {
-                          Alert.alert('Erro', e.message || 'Não foi possível salvar o elenco.');
-                        } finally {
-                          setCarregandoElenco(false);
-                        }
-                      }
-                      setWizardStep('SUBS');
-                    }}
-                  >
-                    {carregandoElenco
-                      ? <ActivityIndicator color="#FFF" />
-                      : <Text style={styles.btnSalvarTxt}>CONFIRMAR ELENCO</Text>
-                    }
+                  <TouchableOpacity style={[styles.btnSalvar, { marginTop: 16 }]} onPress={() => setWizardStep('SUBS')}>
+                    <Text style={styles.btnSalvarTxt}>CONFIRMAR ELENCO</Text>
                   </TouchableOpacity>
                 </View>
               );
