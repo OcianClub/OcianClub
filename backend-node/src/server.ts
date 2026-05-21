@@ -332,10 +332,6 @@ app.patch('/jogadores/:id', async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/jogadores/:id', async (req, res) => {
-  try { await prisma.jogador.delete({ where: { id: Number(req.params.id) } }); res.json({ msg: 'Excluído' }); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
-});
 
 // EXCLUIR JOGADOR
 app.delete('/jogadores/:id', async (req, res) => {
