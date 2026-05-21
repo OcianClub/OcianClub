@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
 import importacaoRoutes from './router/importacao.routes';
+import 'dotenv/config';
 
 const app = express();
 const server = http.createServer(app);
