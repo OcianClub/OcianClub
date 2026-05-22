@@ -12,8 +12,6 @@ export const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: MARGEM,
-    paddingTop: 6,
-    paddingBottom: 40,
   },
 
   // ── Labels de seção ───────────────────────────────────────
@@ -27,52 +25,55 @@ export const styles = StyleSheet.create({
     marginTop: 24,
   },
 
-  // ── Dropdown competição ───────────────────────────────────
-  dropdownBtn: {
+  // ── Banner de edição ──────────────────────────────────────
+  editBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
+    gap: 8,
+    backgroundColor: colors.amarelo + '15',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.amarelo + '25',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  editBannerTxt: {
+    fontFamily: 'Creato-Bold',
+    color: colors.amarelo,
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+
+  // ── Loading ───────────────────────────────────────────────
+  loadingTxt: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text_secondary,
+    fontSize: 13,
+  },
+
+  // ── Categoria bloqueada (modo edição) ─────────────────────
+  categoriaLocked: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    gap: 8,
     borderWidth: 1,
     borderColor: '#2a2a2a',
+    borderStyle: 'dashed',
   },
-  dropdownText: {
-    flex: 1,
+  categoriaLockedNome: {
     fontFamily: 'Creato-Bold',
     color: colors.text,
     fontSize: 14,
-  },
-
-  // ── Toggle Iniciação / Base ───────────────────────────────
-  tipoSwitchContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    marginBottom: 12,
-  },
-  tipoSwitchBtn: {
     flex: 1,
-    paddingVertical: 11,
-    alignItems: 'center',
-    borderRadius: 9,
   },
-  tipoSwitchBtnAtivo: {
-    backgroundColor: colors.primary + '22',
-  },
-  tipoSwitchTxt: {
+  categoriaLockedSub: {
     fontFamily: 'Creato-Bold',
-    color: colors.text_secondary,
-    fontSize: 12,
-    letterSpacing: 0.8,
-  },
-  tipoSwitchTxtAtivo: {
-    color: colors.primary,
+    color: '#2a2a2a',
+    fontSize: 10,
+    letterSpacing: 0.5,
   },
 
   // ── Pills de categoria ────────────────────────────────────
@@ -126,9 +127,12 @@ export const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: colors.primary + '15',
+    backgroundColor: '#2a2a2a',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  addCircle: {
+    backgroundColor: colors.primary + '15',
     borderWidth: 1.5,
     borderColor: colors.primary + '40',
     borderStyle: 'dashed',
@@ -150,6 +154,18 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     textAlign: 'center',
+  },
+  trocarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+  },
+  trocarTxt: {
+    fontFamily: 'Creato-Bold',
+    color: colors.azulClaro,
+    fontSize: 9,
+    letterSpacing: 0.8,
   },
   vsBadge: {
     width: 38,
@@ -194,6 +210,77 @@ export const styles = StyleSheet.create({
     color: colors.primary,
   },
 
+  // ── Stepper de rodada ─────────────────────────────────────
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    overflow: 'hidden',
+    height: 50,
+    alignSelf: 'flex-start',
+    width: 148,
+  },
+  stepperBtn: {
+    width: 44,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#222',
+  },
+  stepperBtnAtivo: {
+    backgroundColor: colors.primary + '22',
+  },
+  stepperBtnDisabled: {
+    opacity: 0.3,
+  },
+  stepperDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#2a2a2a',
+  },
+  stepperValue: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValueTxt: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text,
+    fontSize: 18,
+    letterSpacing: 0.5,
+  },
+  stepperValueZero: {
+    color: '#333',
+  },
+
+  // ── Grupo pills (melhorado) ───────────────────────────────
+  grupoPill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  grupoPillAtivo: {
+    backgroundColor: colors.primary + '22',
+    borderColor: colors.primary + '88',
+  },
+  grupoPillTxt: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text_secondary,
+    fontSize: 14,
+    letterSpacing: 1,
+  },
+  grupoPillTxtAtivo: {
+    color: colors.primary,
+  },
+
   // ── Inputs ────────────────────────────────────────────────
   rowDuplo: {
     flexDirection: 'row',
@@ -219,11 +306,27 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  explorarText: {
+
+  // ── Resumo pré-salvar ─────────────────────────────────────
+  resumoCard: {
+    backgroundColor: '#6FCF97' + '0d',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#6FCF97' + '30',
+    gap: 6,
+    marginTop: 20,
+  },
+  resumoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resumoTxt: {
     fontFamily: 'Creato-Bold',
-    color: colors.azulClaro,
+    color: colors.text_secondary,
     fontSize: 12,
-    letterSpacing: 0.8,
+    flex: 1,
   },
 
   // ── Botão salvar ──────────────────────────────────────────
@@ -259,6 +362,16 @@ export const styles = StyleSheet.create({
     borderColor: '#2a2a2a',
     gap: 4,
   },
+  handle: {
+    alignItems: 'center',
+    paddingBottom: 12,
+  },
+  handleBar: {
+    width: 36,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#2a2a2a',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -269,6 +382,13 @@ export const styles = StyleSheet.create({
     fontFamily: 'Creato-Bold',
     color: colors.text,
     fontSize: 16,
+  },
+  modalSub: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text_secondary,
+    fontSize: 11,
+    letterSpacing: 0.5,
+    marginTop: 2,
   },
   modalItem: {
     flexDirection: 'row',
@@ -289,5 +409,15 @@ export const styles = StyleSheet.create({
   modalItemTextActive: {
     fontFamily: 'Creato-Bold',
     color: colors.text,
+  },
+  checkBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    backgroundColor: colors.primary + '22',
+    borderWidth: 1,
+    borderColor: colors.primary + '55',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
