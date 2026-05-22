@@ -82,24 +82,27 @@ export const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   pill: {
-    backgroundColor: '#1A1A1A',
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 22,
-    borderRadius: 20,
+    paddingVertical: 11,
+    borderRadius: 8,
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
     borderColor: '#2a2a2a',
   },
   pillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary + '18',
+    borderColor: colors.primary + '60',
   },
   pillText: {
     fontFamily: 'Creato-Bold',
-    color: colors.text_secondary,
     fontSize: 13,
+    color: colors.text_secondary,
   },
   pillTextActive: {
-    color: colors.text,
+    color: colors.primary,
   },
 
   // ── Confronto ─────────────────────────────────────────────

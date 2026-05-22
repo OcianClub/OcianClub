@@ -77,6 +77,9 @@ export const styles = StyleSheet.create({
 
   // ── Pills de categoria ────────────────────────────────────
   pillRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flex: 1,
     gap: 10,
     paddingVertical: 4,
   },
@@ -84,7 +87,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     paddingVertical: 10,
     paddingHorizontal: 22,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#2a2a2a',
   },

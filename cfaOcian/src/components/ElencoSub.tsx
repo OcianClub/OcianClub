@@ -533,7 +533,7 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         {carregandoScout ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <ActivityIndicator size={10} color={colors.primary} />
-            <Text style={s.scoutLoadingTxt}>IA...</Text>
+            <Text style={s.scoutLoadingTxt}>Carregando...</Text>
           </View>
         ) : (
           <Text style={s.counterTxt}>{jogadoresFiltrados.length} atleta{jogadoresFiltrados.length !== 1 ? 's' : ''}</Text>

@@ -95,27 +95,28 @@ export const styles = StyleSheet.create({
   },
 
   // ── PILLS (BOTÕES PARA SELECIONAR SUBS) ──
-  pill: {
-    backgroundColor: '#1A1A1A',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
+    pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 8,
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
     borderColor: '#2a2a2a',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   pillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary + '18',
+    borderColor: colors.primary + '60',
   },
   pillText: {
     fontFamily: 'Creato-Bold',
+    fontSize: 13,
     color: colors.text_secondary,
-    fontSize: 11,
   },
   pillTextActive: {
-    color: '#FFF',
+    color: colors.primary,
   },
 
   // ── GRID DE CATEGORIAS (USADO NO OCIAN E ADVERSÁRIOS) ──

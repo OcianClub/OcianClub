@@ -35,6 +35,7 @@ function CardsMeuPerfil({ titulo, subtitulo, icone, action }: CardMenuProps) {
   );
 }
 
+
 export default function Perfil() {
   const [nome, setNome] = useState('');
   const [membroDesde, setMembroDesde] = useState('');
@@ -49,11 +50,12 @@ export default function Perfil() {
     icone: keyof typeof MaterialCommunityIcons.glyphMap;
     action: () => void;
   }
+  const [ehAdmin, setEhAdmin] = useState(false);
 
   const MEU_PERFIL: MenuItem[] = [
-    { id: 1, titulo: "Dados Pessoais", subtitulo: "Gerencie suas informações básicas",  icone: "account-outline", action: () => setModalDadosPessoais(true)  },
-    { id: 2, titulo: "Equipes", subtitulo: "Times e campeonatos cadastrados", icone: "account-group",   action: () => setModalMinhasEquipes(true)  },
-    { id: 3, titulo: "Notificações",   subtitulo: "Preferências de alertas e avisos",   icone: "bell",            action: () => {}                           },
+    { id: 1, titulo: "Dados Pessoais", subtitulo: "Gerencie suas informações básicas", icone: "account-outline", action: () => setModalDadosPessoais(true) },
+    ...(ehAdmin ? [{ id: 2, titulo: "Equipes", subtitulo: "Times e campeonatos cadastrados", icone: "account-group" as any, action: () => setModalMinhasEquipes(true) }] : []),
+    { id: 3, titulo: "Notificações", subtitulo: "Preferências de alertas e avisos", icone: "bell" as any, action: () => {} },
   ];
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export default function Perfil() {
         setMembroDesde(formatted);
       }
     });
+    SecureStore.getItemAsync('userRole').then(role => setEhAdmin(role === 'ADMIN')); // ← adicionar
   }, []);
 
   const fecharDadosPessoais = async () => {

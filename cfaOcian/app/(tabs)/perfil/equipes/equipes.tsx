@@ -177,6 +177,23 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
     }
   };
 
+  // Salva de fato a súmula/elenco no banco antes de ir pra tela de jogos
+  const avancarParaJogos = async () => {
+    setSalvando(true);
+    try {
+      if (itemSelecionado && 'ano' in itemSelecionado) {
+        // Junta os IDs de todas as categorias do campeonato e manda pro banco
+        const todosJogadores = Object.values(elencoSelecionado).flat();
+        await salvarElencoCompeticao(itemSelecionado.id, todosJogadores);
+      }
+      setWizardStep('JOGOS');
+    } catch (err: any) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const abrirSelecaoElenco = (sub: Categoria) => {
     setWizardSubAtivo(sub);
     setWizardStep('ELENCO');
@@ -360,7 +377,6 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
     );
   };
 
-  // Tela do elenco: ocupa o lugar da tela principal enquanto visível
   if (elencoSubVisivel && categoriaElenco) {
     return (
       <ElencoSub
@@ -503,7 +519,8 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
 
       {/* ── WIZARD DE CAMPEONATOS ── */}
       <Modal visible={wizardVisivel} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setWizardVisivel(false)}>
+        <View style={styles.modalOverlay}>
+          {/* Trocado Pressable para View para não fechar clicando fora */}
           <Pressable style={[styles.modalCard, { maxHeight: '90%' }]}>
 
             <View style={styles.modalHeader}>
@@ -578,8 +595,8 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
                     );
                   })}
                 </View>
-                <TouchableOpacity style={[styles.btnSalvar, { marginTop: 24 }]} onPress={() => setWizardStep('JOGOS')}>
-                  <Text style={styles.btnSalvarTxt}>IR PARA TABELA DE JOGOS</Text>
+                <TouchableOpacity style={[styles.btnSalvar, { marginTop: 24 }]} onPress={avancarParaJogos} disabled={salvando}>
+                  {salvando ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnSalvarTxt}>IR PARA TABELA DE JOGOS</Text>}
                 </TouchableOpacity>
               </View>
             )}
@@ -673,24 +690,6 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
                   </View>
                 </TouchableOpacity>
 
-                {/* Importar Foto */}
-                <TouchableOpacity
-                  style={[styles.wizardOptionCard, { borderColor: colors.azulClaro, opacity: importando ? 0.6 : 1 }]}
-                  onPress={() => !importando && importarArquivo('imagem')}
-                  activeOpacity={0.8}
-                  disabled={importando}
-                >
-                  <View style={[styles.wizardOptionIcon, { backgroundColor: colors.azulClaro + '22' }]}>
-                    {importando
-                      ? <ActivityIndicator color={colors.azulClaro} size={28} />
-                      : <MaterialCommunityIcons name="camera-outline" size={32} color={colors.azulClaro} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.wizardOptionTitle, { color: colors.azulClaro }]}>Tirar Foto da Tabela</Text>
-                    <Text style={styles.wizardOptionSub}>Fotografe a tabela impressa e a IA extrai os jogos do Ocian.</Text>
-                  </View>
-                </TouchableOpacity>
-
                 {importando && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary + '11', borderRadius: 8, padding: 12 }}>
                     <ActivityIndicator color={colors.primary} size="small" />
@@ -698,14 +697,18 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
                   </View>
                 )}
 
-                <TouchableOpacity style={[styles.btnNao, { marginTop: 4 }]} onPress={() => { setWizardVisivel(false); carregarDados(); }} disabled={importando}>
-                  <Text style={styles.txtNao}>FINALIZAR DEPOIS</Text>
+                <TouchableOpacity 
+                  style={{ paddingVertical: 14, alignItems: 'center', marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', backgroundColor: '#1a1a1a' }} 
+                  onPress={() => { setWizardVisivel(false); carregarDados(); }} 
+                  disabled={importando}
+                >
+                  <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 13 }}>FINALIZAR CRIAÇÃO</Text>
                 </TouchableOpacity>
               </View>
             )}
 
           </Pressable>
-        </Pressable>
+        </View>
       </Modal>
 
       {/* ── MODAL ORGANIZAR PARTIDA (CAMPEONATO) ── */}

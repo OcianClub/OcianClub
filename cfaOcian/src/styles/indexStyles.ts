@@ -108,7 +108,7 @@ export const styles = StyleSheet.create({
   teamName: {
     fontFamily: 'Creato-Bold',
     color: '#FFF',
-    fontSize: 32,
+    fontSize: 28,
     marginBottom: 4,
   },
   playerStats: {
@@ -123,6 +123,8 @@ export const styles = StyleSheet.create({
   },
   topCard: {
     flexDirection: 'column',
+    flex: 1,
+    marginRight: 16,
   },
   containerIcon: {
     flexDirection: 'row',
