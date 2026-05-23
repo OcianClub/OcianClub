@@ -201,14 +201,38 @@ app.delete('/competicoes/:id', async (req, res) => {
 
 // LISTA OS JOGADORES INSCRITOS NO CAMPEONATO
 app.get('/competicoes/:id/jogadores', async (req, res) => {
+  const competicao_id = Number(req.params.id);
+  const categoria_id  = req.query.categoria_id ? Number(req.query.categoria_id) : undefined;
+ 
   try {
+    const where: any = { competicao_id };
+    if (categoria_id) {
+      where.jogador = { categoria_id };
+    }
+ 
     const inscricoes = await prisma.competicaoJogador.findMany({
-      where: { competicao_id: Number(req.params.id) },
-      include: { jogador: true }
+      where,
+      include: {
+        jogador: {
+          select: { id: true, nome: true, posicao: true, numCamisa: true, categoria_id: true },
+        },
+      },
+      orderBy: { jogador: { numCamisa: 'asc' } },
     });
-    res.json(inscricoes.map(i => i.jogador));
-  } catch (error: any) { res.status(500).json({ error: 'Erro ao buscar elenco' }); }
+ 
+    const resultado = inscricoes.map(i => ({
+      id_jogador: i.jogador.id,
+      nome:       i.jogador.nome,
+      posicao:    i.jogador.posicao,
+      numCamisa:  i.jogador.numCamisa,
+    }));
+ 
+    res.json(resultado);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao buscar elenco da competição' });
+  }
 });
+
 
 // SALVA O ELENCO NO CAMPEONATO (Faltava isso!)
 app.put('/competicoes/:id/jogadores', async (req, res) => {
@@ -594,6 +618,71 @@ async function processarMachineLearning() {
     console.error("Falha ao comunicar com microsserviço de IA Python:", error.message || error);
   }
 }
+
+// ══════════════════════════════════════════════════════════
+// ROTAS DE ESCALAÇÃO — adicionar ao server.ts antes do listen
+// ══════════════════════════════════════════════════════════
+
+// GET /partidas/:id/escalacao
+// Retorna a escalação completa de uma partida com dados do jogador
+app.get('/partidas/:id/escalacao', async (req, res) => {
+  const partidaId = Number(req.params.id);
+  try {
+    const escalacao = await prisma.escalacaoPartida.findMany({
+      where: { partida_id: partidaId },
+      include: {
+        jogador: {
+          select: { nome: true, posicao: true, numCamisa: true },
+        },
+      },
+      orderBy: [{ titular: 'desc' }, { numCamisa: 'asc' }],
+    });
+    res.json(escalacao);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Erro ao buscar escalação' });
+  }
+});
+
+// PUT /partidas/:id/escalacao
+// Substitui a escalação inteira de uma partida (idempotente)
+// Body: { jogadores: [{ jogador_id, numCamisa, titular }] }
+app.put('/partidas/:id/escalacao', async (req, res) => {
+  const partidaId = Number(req.params.id);
+  const { jogadores } = req.body as {
+    jogadores: { jogador_id: number; numCamisa: number; titular: boolean }[];
+  };
+
+  if (!Array.isArray(jogadores)) {
+    return res.status(400).json({ error: 'jogadores deve ser um array' });
+  }
+
+  try {
+    // Apaga escalação anterior e recria (transaction)
+    await prisma.$transaction([
+      prisma.escalacaoPartida.deleteMany({ where: { partida_id: partidaId } }),
+      prisma.escalacaoPartida.createMany({
+        data: jogadores.map(j => ({
+          partida_id: partidaId,
+          jogador_id: Number(j.jogador_id),
+          numCamisa: Number(j.numCamisa),
+          titular: Boolean(j.titular),
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+
+    const nova = await prisma.escalacaoPartida.findMany({
+      where: { partida_id: partidaId },
+      include: { jogador: { select: { nome: true, posicao: true, numCamisa: true } } },
+      orderBy: [{ titular: 'desc' }, { numCamisa: 'asc' }],
+    });
+
+    res.json(nova);
+  } catch (error: any) {
+    console.error('Erro ao salvar escalação:', error.message);
+    res.status(500).json({ error: error.message || 'Erro ao salvar escalação' });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT as number, '0.0.0.0', () => {

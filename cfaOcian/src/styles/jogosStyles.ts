@@ -69,21 +69,27 @@ export const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pill: {
-    backgroundColor: colors.cinza, 
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
   },
   pillActive: {
-    backgroundColor: colors.primary, 
+    backgroundColor: colors.primary + '18',
+    borderColor: colors.primary + '60',
   },
   pillText: {
     fontFamily: 'Creato-Bold',
+    fontSize: 13,
     color: colors.text_secondary,
-    fontSize: 14,
   },
   pillTextActive: {
-    color: colors.text,
+    color: colors.primary,
   },
 
   // --- LISTAGEM E DATAS ---
