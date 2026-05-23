@@ -657,19 +657,17 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
   }
 
   try {
-    // Apaga escalação anterior e recria (transaction)
-    await prisma.$transaction([
-      prisma.escalacaoPartida.deleteMany({ where: { partida_id: partidaId } }),
-      prisma.escalacaoPartida.createMany({
-        data: jogadores.map(j => ({
-          partida_id: partidaId,
-          jogador_id: Number(j.jogador_id),
-          numCamisa: Number(j.numCamisa),
-          titular: Boolean(j.titular),
-        })),
-        skipDuplicates: true,
-      }),
-    ]);
+    // Delete sequencial — garante que os registros antigos são removidos
+    // antes de inserir os novos, evitando violação do @@unique([partida_id, numCamisa])
+    await prisma.escalacaoPartida.deleteMany({ where: { partida_id: partidaId } });
+    await prisma.escalacaoPartida.createMany({
+      data: jogadores.map(j => ({
+        partida_id: partidaId,
+        jogador_id: Number(j.jogador_id),
+        numCamisa: Number(j.numCamisa),
+        titular: Boolean(j.titular),
+      })),
+    });
 
     const nova = await prisma.escalacaoPartida.findMany({
       where: { partida_id: partidaId },
