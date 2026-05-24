@@ -9,7 +9,7 @@ import Svg, { Polygon, Line, Text as SvgText } from 'react-native-svg';
 
 import { obterPerfisJogadores, Jogador, ScoresMl } from '@/src/services/mlService';
 import { Header } from '@/src/components/Header';
-import { CarrosselSubs, SUBS } from '@/src/components/CarrosselSubs';
+import { CarrosselSubs, SUBS_INICIACAO, SUBS_BASE } from '@/src/components/CarrosselSubs';
 import { colors } from '@/src/theme/colors';
 import { styles } from '@/src/styles/estatisticasStyles'; 
 
@@ -306,9 +306,10 @@ export default function Estatisticas() {
   const [jogadorSelecionado, setJogadorSelecionado] = useState<Jogador | null>(null);
 
   const [subIndex, setSubIndex]     = useState(0);
-  const [tipoAtivo, setTipoAtivo]   = useState<'INICIACAO' | 'BASE'>('BASE');
+  const [tipoAtivo, setTipoAtivo]   = useState<'INICIACAO' | 'BASE'>('INICIACAO');
 
-  const categoriaAtual = SUBS[subIndex].title;
+  const subsAtivos = tipoAtivo === 'INICIACAO' ? SUBS_INICIACAO : SUBS_BASE;
+  const categoriaAtual = subsAtivos[subIndex]?.title ?? '';
 
   const carregarDados = useCallback(async () => {
     setCarregando(true);
@@ -316,6 +317,19 @@ export default function Estatisticas() {
     try {
       const todos = await obterPerfisJogadores();
       setJogadores(todos);
+
+      // Ajusta tipo e sub para o primeiro jogador encontrado
+      if (todos.length > 0) {
+        const primeiro = todos[0];
+        if (primeiro.categoria_tipo) setTipoAtivo(primeiro.categoria_tipo);
+
+        // Acha o índice do sub no carrossel que bate com a categoria do primeiro jogador
+        const subsDoTipo = primeiro.categoria_tipo === 'INICIACAO' ? SUBS_INICIACAO : SUBS_BASE;
+        const idxSub = subsDoTipo.findIndex(s =>
+          s.title.toLowerCase().replace(/\s+/g, '-') === primeiro.categoria.toLowerCase()
+        );
+        if (idxSub >= 0) setSubIndex(idxSub);
+      }
     } catch (e: any) {
       setErro(e?.message ?? 'Erro na conexão');
     } finally {
@@ -325,8 +339,12 @@ export default function Estatisticas() {
 
   useFocusEffect(useCallback(() => { carregarDados(); }, [carregarDados]));
 
+  // Normaliza para comparação: "Sub 7" → "sub-7", "sub-7" → "sub-7"
+  const normalizarCategoria = (s: string) =>
+    s.toLowerCase().replace(/\s+/g, '-');
+
   const jogadoresFiltrados = jogadores.filter(j => {
-    const matchCategoria = j.categoria.toLowerCase() === categoriaAtual.toLowerCase().replace(' ', '-');
+    const matchCategoria = normalizarCategoria(j.categoria) === normalizarCategoria(categoriaAtual);
     const matchTipo      = j.categoria_tipo === tipoAtivo;
     const matchBusca     = busca === '' ||
       j.nome.toLowerCase().includes(busca.toLowerCase()) ||

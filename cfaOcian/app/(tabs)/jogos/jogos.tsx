@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView, Modal, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+  View, Text, TouchableOpacity, Image, ScrollView,
+  Modal, Pressable, ActivityIndicator, RefreshControl,
+} from 'react-native';
 import { styles } from '../../../src/styles/jogosStyles';
 import { Header } from '@/src/components/Header';
 import { colors } from '@/src/theme/colors';
@@ -11,8 +14,17 @@ import * as SecureStore from 'expo-secure-store';
 import { fetchPartidas } from '@/src/services/api';
 import OrganizarPartidas from '../organizarPartidas/organizarPartidas';
 import { CarrosselSubs, SUBS_INICIACAO, SUBS_BASE } from '@/src/components/CarrosselSubs';
+import DetalhesPartida, { Partida as PartidaDetalhes } from '@/src/components/DetalhesPartida';
 
 const FILTROS_MES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+type StatusFiltro = 'TODOS' | 'AGENDADA' | 'AO_VIVO' | 'FINALIZADA';
+const STATUS_OPTIONS: { label: string; value: StatusFiltro }[] = [
+  { label: 'Todos os Jogos', value: 'TODOS' },
+  { label: 'Agendados',      value: 'AGENDADA' },
+  { label: 'Ao Vivo',        value: 'AO_VIVO' },
+  { label: 'Finalizados',    value: 'FINALIZADA' },
+];
 
 interface Time { id: number; nome: string; escudo: string | null; }
 interface Partida {
@@ -66,15 +78,18 @@ function BadgeStatus({ status }: { status: Partida['status'] }) {
 export default function Jogos() {
   const pagerRef = useRef<PagerView>(null);
 
-  const [isAdmin,         setIsAdmin]         = useState(false);
-  const [mesAtivo,        setMesAtivo]        = useState(new Date().getMonth() + 1);
-  const [tipoFiltro,      setTipoFiltro]      = useState<'INICIACAO' | 'BASE'>('INICIACAO');
-  const [subIndex,        setSubIndex]        = useState(0);
-  const [modalMesVisible, setModalMesVisible] = useState(false);
-  const [dias,            setDias]            = useState<DiaJogo[]>([]);
-  const [carregando,      setCarregando]      = useState(true);
-  const [refreshing,      setRefreshing]      = useState(false);
-  const [modalOrganizar,  setModalOrganizar]  = useState(false);
+  const [partidaSelecionada, setPartidaSelecionada] = useState<Partida | null>(null);
+  const [isAdmin,          setIsAdmin]          = useState(false);
+  const [mesAtivo,         setMesAtivo]         = useState(new Date().getMonth() + 1);
+  const [tipoFiltro,       setTipoFiltro]       = useState<'INICIACAO' | 'BASE'>('INICIACAO');
+  const [subIndex,         setSubIndex]         = useState(0);
+  const [modalMesVisible,  setModalMesVisible]  = useState(false);
+  const [modalStatusVisible, setModalStatusVisible] = useState(false);
+  const [dias,             setDias]             = useState<DiaJogo[]>([]);
+  const [carregando,       setCarregando]       = useState(true);
+  const [refreshing,       setRefreshing]       = useState(false);
+  const [modalOrganizar,   setModalOrganizar]   = useState(false);
+  const [statusFiltro,     setStatusFiltro]     = useState<StatusFiltro>('TODOS');
 
   useEffect(() => {
     SecureStore.getItemAsync('userRole').then(role => setIsAdmin(role === 'ADMIN'));
@@ -82,7 +97,9 @@ export default function Jogos() {
 
   const carregarPartidas = useCallback(async () => {
     try {
-      const partidas: Partida[] = await fetchPartidas({ mes: mesAtivo });
+      const params: any = { mes: mesAtivo };
+      if (statusFiltro !== 'TODOS') params.status = statusFiltro;
+      const partidas: Partida[] = await fetchPartidas(params);
       setDias(agruparPorDia(partidas));
     } catch (e) {
       console.error(e);
@@ -90,7 +107,7 @@ export default function Jogos() {
       setCarregando(false);
       setRefreshing(false);
     }
-  }, [mesAtivo]);
+  }, [mesAtivo, statusFiltro]);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,11 +152,24 @@ export default function Jogos() {
       <Header title="JOGOS" btnNotificacao="bell" showLogo={false} icon="soccer" showProfile={true} />
 
       <View style={styles.filtersContainer}>
-        <View style={styles.filterHeader}>
-          <TouchableOpacity activeOpacity={0.7} style={styles.monthSelectorBtn} onPress={() => setModalMesVisible(true)}>
-            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
-            <Text style={styles.monthSelectorText}>{FILTROS_MES[mesAtivo - 1]}</Text>
-            <MaterialCommunityIcons name="chevron-down" size={20} color="#888" />
+        {/* Lado a Lado: Mês e Status */}
+        <View style={styles.filterRow}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.filterBtn} onPress={() => setModalMesVisible(true)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
+              <Text style={styles.filterBtnText}>{FILTROS_MES[mesAtivo - 1]}</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+          </TouchableOpacity>
+
+          <TouchableOpacity activeOpacity={0.7} style={styles.filterBtn} onPress={() => setModalStatusVisible(true)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialCommunityIcons name="filter-variant" size={20} color={statusFiltro === 'AO_VIVO' ? colors.vermelho : colors.primary} />
+              <Text style={[styles.filterBtnText, statusFiltro === 'AO_VIVO' && { color: colors.vermelho }]}>
+                {STATUS_OPTIONS.find(o => o.value === statusFiltro)?.label}
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
           </TouchableOpacity>
         </View>
 
@@ -175,7 +205,7 @@ export default function Jogos() {
                   <View style={{ alignItems: 'center', marginTop: 60, gap: 12 }}>
                     <MaterialCommunityIcons name="calendar-remove-outline" size={48} color="#333" />
                     <Text style={{ fontFamily: 'Creato-Bold', color: '#444', fontSize: 14, letterSpacing: 1 }}>
-                      NENHUM JOGO NESTE MÊS
+                      NENHUM JOGO COM ESTES FILTROS
                     </Text>
                   </View>
                 ) : (
@@ -187,7 +217,18 @@ export default function Jogos() {
                       </View>
 
                       {dia.filtradas.map(partida => (
-                        <View key={partida.id} style={styles.matchCard}>
+                        <TouchableOpacity
+                          key={partida.id}
+                          style={[
+                            styles.matchCard,
+                            partida.status === 'AO_VIVO' && {
+                              borderWidth: 1,
+                              borderColor: colors.vermelho + '44',
+                            },
+                          ]}
+                          activeOpacity={0.85}
+                          onPress={() => setPartidaSelecionada(partida)}
+                        >
                           <View style={styles.cardTop}>
                             <View style={styles.cardTopLeft}>
                               <MaterialCommunityIcons name="clock-outline" size={16} color={colors.text_secondary} />
@@ -239,7 +280,7 @@ export default function Jogos() {
                             <MaterialCommunityIcons name="map-marker-outline" size={16} color="#AAAAAA" />
                             <Text style={styles.locationText}>{partida.local ?? 'Local não definido'}</Text>
                           </View>
-                        </View>
+                        </TouchableOpacity>
                       ))}
                     </View>
                   ))
@@ -259,10 +300,12 @@ export default function Jogos() {
         </TouchableOpacity>
       )}
 
+      {/* MODAL ORGANIZAR */}
       <Modal visible={modalOrganizar} transparent={false} animationType="slide" onRequestClose={() => setModalOrganizar(false)}>
         <OrganizarPartidas noModal={true} onFechar={() => { setModalOrganizar(false); carregarPartidas(); }} />
       </Modal>
 
+      {/* MODAL MÊS */}
       <Modal visible={modalMesVisible} transparent={true} animationType="fade" onRequestClose={() => setModalMesVisible(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setModalMesVisible(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
@@ -291,6 +334,49 @@ export default function Jogos() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* MODAL STATUS */}
+      <Modal visible={modalStatusVisible} transparent={true} animationType="fade" onRequestClose={() => setModalStatusVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setModalStatusVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filtrar por Status</Text>
+              <TouchableOpacity onPress={() => setModalStatusVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View>
+              {STATUS_OPTIONS.map((status) => (
+                <TouchableOpacity
+                  key={status.value}
+                  style={[styles.statusItem, statusFiltro === status.value && styles.statusItemActive]}
+                  onPress={() => { setStatusFiltro(status.value); setModalStatusVisible(false); }}
+                >
+                  <Text style={[styles.statusItemText, statusFiltro === status.value && styles.statusItemTextActive]}>
+                    {status.label}
+                  </Text>
+                  {statusFiltro === status.value && <MaterialCommunityIcons name="check" size={20} color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {partidaSelecionada && (
+        <Modal
+          visible={!!partidaSelecionada}
+          transparent={false}
+          animationType="slide"
+          onRequestClose={() => setPartidaSelecionada(null)}
+        >
+          <DetalhesPartida
+            partida={partidaSelecionada as PartidaDetalhes}
+            isAdmin={isAdmin}
+            onBack={() => { setPartidaSelecionada(null); carregarPartidas(); }}
+          />
+        </Modal>
+      )}
     </View>
   );
 }
