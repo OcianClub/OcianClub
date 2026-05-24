@@ -202,7 +202,7 @@ Formato exato:
 
   // ── 7. Monta inserts em memória, depois cria em batch ─────────────────────
   const resultado = { criados: 0, pulados: 0 };
-  const insertsPartida: Parameters<typeof prisma.partida.createMany>[0]['data'] = [];
+  const insertsPartida: any[] = [];
   const hoje = new Date();
 
   for (const jogo of jogos) {
