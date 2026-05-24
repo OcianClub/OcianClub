@@ -12,29 +12,34 @@ export const styles = StyleSheet.create({
     paddingTop: 10,
   },
   
-  // --- FILTROS (DROPDOWN DE MÊS, TOGGLE E PILLS) ---
+  // --- FILTROS (MÊS E STATUS LADO A LADO) ---
   filtersContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  filterHeader: {
+  filterRow: {
+    flexDirection: 'row',
     paddingHorizontal: MARGEM_CONTEUDO,
     marginBottom: 16,
-    alignItems: 'flex-start',
+    gap: 12,
   },
-  monthSelectorBtn: {
+  filterBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#1a1a1a', 
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    gap: 8,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
   },
-  monthSelectorText: {
+  filterBtnText: {
     fontFamily: 'Creato-Bold',
     color: colors.text,
-    fontSize: 16,
+    fontSize: 14,
   },
+  
   tipoSwitchContainer: {
     flexDirection: 'row',
     backgroundColor: '#1A1A1A',
@@ -61,34 +66,6 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   tipoSwitchTxtAtivo: {
-    color: colors.primary,
-  },
-  pillRow: {
-    paddingHorizontal: MARGEM_CONTEUDO,
-    gap: 12,
-    marginBottom: 16,
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 8,
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  pillActive: {
-    backgroundColor: colors.primary + '18',
-    borderColor: colors.primary + '60',
-  },
-  pillText: {
-    fontFamily: 'Creato-Bold',
-    fontSize: 13,
-    color: colors.text_secondary,
-  },
-  pillTextActive: {
     color: colors.primary,
   },
 
@@ -227,7 +204,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // --- MODAL SELETOR DE MÊS ---
+  // --- MODAIS SELETORES (GENÉRICO) ---
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.75)', 
@@ -239,7 +216,7 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: colors.cinza,
+    borderColor: '#2a2a2a',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -252,6 +229,31 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.text,
   },
+  
+  // --- LISTA DO MODAL DE STATUS ---
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  statusItemActive: {
+    backgroundColor: colors.primary + '18',
+  },
+  statusItemText: {
+    fontFamily: 'Creato-Medium',
+    color: colors.text_secondary,
+    fontSize: 15,
+  },
+  statusItemTextActive: {
+    color: colors.text,
+    fontFamily: 'Creato-Bold',
+  },
+
+  // --- GRID DO MODAL DE MÊS ---
   monthGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -260,13 +262,16 @@ export const styles = StyleSheet.create({
   },
   monthGridItem: {
     width: '30%', 
-    backgroundColor: colors.cinza,
+    backgroundColor: '#1a1a1a',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2a2a2a'
   },
   monthGridItemActive: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   monthGridText: {
     fontFamily: 'Creato-Medium',
@@ -276,38 +281,5 @@ export const styles = StyleSheet.create({
   monthGridTextActive: {
     color: colors.text,
     fontFamily: 'Creato-Bold',
-  },
-
-  // --- CARROSSEL DE MESES ---
-  monthCarrosselContainer: {
-    paddingTop: 10,
-    paddingBottom: 5,
-  },
-  monthListContent: {
-    paddingHorizontal: MARGEM_CONTEUDO,
-    gap: 10,
-  },
-  monthPill: {
-    backgroundColor: '#1a1a1a',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  monthPillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  monthPillText: {
-    fontFamily: 'Creato-Bold',
-    color: colors.text_secondary,
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
-  monthPillTextActive: {
-    color: '#FFF',
   },
 });

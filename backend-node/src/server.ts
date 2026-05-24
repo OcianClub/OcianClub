@@ -17,7 +17,6 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-// Rota conectando a IA de Leitura de Tabelas!
 app.use('/partidas/importar', importacaoRoutes);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo_super_seguro_ocian';
@@ -243,9 +242,10 @@ app.put('/competicoes/:id/jogadores', async (req, res) => {
   }
   try {
     await prisma.competicaoJogador.deleteMany({ where: { competicao_id } });
-    if (jogador_ids.length > 0) {
+    const idsValidos = jogador_ids.filter((id): id is number => id != null && !isNaN(Number(id)));
+    if (idsValidos.length > 0) {
       await prisma.competicaoJogador.createMany({
-        data: jogador_ids.map(jogador_id => ({ competicao_id, jogador_id })),
+        data: idsValidos.map(jogador_id => ({ competicao_id, jogador_id: Number(jogador_id) })),
         skipDuplicates: true,
       });
     }

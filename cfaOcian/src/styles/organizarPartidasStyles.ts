@@ -229,6 +229,35 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
+  // ── Escalação na Criação ──────────────────────────────────
+  escalacaoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  escalacaoBtnLabel: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text,
+    fontSize: 14,
+  },
+  escalacaoBtnBadge: {
+    backgroundColor: colors.primary + '33',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  escalacaoBtnBadgeText: {
+    fontFamily: 'Creato-Bold',
+    color: colors.primary,
+    fontSize: 10,
+  },
+
   // ── Botão salvar ──────────────────────────────────────────
   salvarBtn: {
     marginTop: 32,
@@ -247,7 +276,7 @@ export const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
 
-  // ── Modal ─────────────────────────────────────────────────
+  // ── Modais Genéricos ───────────────────────────────────────
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',
@@ -292,5 +321,101 @@ export const styles = StyleSheet.create({
   modalItemTextActive: {
     fontFamily: 'Creato-Bold',
     color: colors.text,
+  },
+
+  // ── MODAL ALTERAR ESCALAÇÃO (Fullscreen) ───────────────────
+  fullModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  fullModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: MARGEM,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e1e1e',
+    gap: 12,
+  },
+  fullModalTitle: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text,
+    fontSize: 16,
+    letterSpacing: 1,
+    flex: 1,
+  },
+  escalacaoColumns: {
+    flexDirection: 'row',
+    flex: 1,
+    gap: 0,
+  },
+  escalacaoColumn: {
+    flex: 1,
+    padding: 14,
+  },
+  escalacaoColumnTitle: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text_secondary,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  escalacaoColumnDivider: {
+    width: 1,
+    backgroundColor: '#1e1e1e',
+  },
+  jogadorSelectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#252525',
+  },
+  jogadorSelectRowActive: {
+    borderColor: colors.primary + '88',
+    backgroundColor: colors.primary + '12',
+  },
+  checkBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkBoxActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  jogadorSelectNome: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text,
+    fontSize: 13,
+    flex: 1,
+  },
+  jogadorSelectPos: {
+    fontFamily: 'Creato-Regular',
+    color: colors.text_secondary,
+    fontSize: 11,
+  },
+  applyEscalacaoBtn: {
+    backgroundColor: colors.primary,
+    margin: MARGEM,
+    borderRadius: 12,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  applyEscalacaoBtnText: {
+    fontFamily: 'Creato-Bold',
+    color: '#fff',
+    fontSize: 14,
+    letterSpacing: 0.8,
   },
 });

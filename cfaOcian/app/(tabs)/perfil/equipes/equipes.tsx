@@ -183,7 +183,8 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
     try {
       if (itemSelecionado && 'ano' in itemSelecionado) {
         // Junta os IDs de todas as categorias do campeonato e manda pro banco
-        const todosJogadores = Object.values(elencoSelecionado).flat();
+        const todosJogadores = (Object.values(elencoSelecionado).flat() as any[])
+          .filter((id): id is number => id != null && typeof id === 'number');
         await salvarElencoCompeticao(itemSelecionado.id, todosJogadores);
       }
       setWizardStep('JOGOS');
@@ -601,11 +602,29 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
               </View>
             )}
 
-            {/* PASSO 3 - ELENCO */}
+           {/* PASSO 3 - ELENCO */}
             {wizardStep === 'ELENCO' && wizardSubAtivo && (() => {
               const jogadoresDoCat = jogadores.filter(j => Number(j.categoria_id) === Number(wizardSubAtivo.id));
+              
+              // ── Lógica do Selecionar Todos ──
+              const selecionadosDestaCategoria = elencoSelecionado[wizardSubAtivo.id] || [];
+              const todosSelecionados = jogadoresDoCat.length > 0 && jogadoresDoCat.every(j => selecionadosDestaCategoria.includes(j.id));
+
+              const toggleSelecionarTodos = () => {
+                setElencoSelecionado(prev => {
+                  if (todosSelecionados) {
+                    // Se já estão todos marcados, desmarca tudo
+                    return { ...prev, [wizardSubAtivo.id]: [] };
+                  } else {
+                    // Se não, marca o ID de todos os jogadores da tela
+                    const todosIds = jogadoresDoCat.map(j => j.id);
+                    return { ...prev, [wizardSubAtivo.id]: todosIds };
+                  }
+                });
+              };
+
               return (
-                <View style={{ minHeight: 300 }}>
+                <View>
                   <Text style={[styles.modalSubtitulo, { marginBottom: 12 }]}>
                     {jogadoresDoCat.length} atleta{jogadoresDoCat.length !== 1 ? 's' : ''} no {wizardSubAtivo.nome}
                   </Text>
@@ -615,23 +634,46 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
                       <Text style={{ color: '#555', marginTop: 8, textAlign: 'center' }}>Nenhum atleta cadastrado neste sub.</Text>
                     </View>
                   ) : (
-                    jogadoresDoCat.map(item => {
-                      const selecionado = !!(elencoSelecionado[wizardSubAtivo.id]?.includes(item.id));
-                      return (
-                        <TouchableOpacity
-                          key={item.id.toString()}
-                          style={[styles.cardJogadorModal, selecionado && { borderColor: colors.primary, backgroundColor: colors.primary + '11' }]}
-                          onPress={() => toggleJogadorElenco(item.id)}
-                          activeOpacity={0.7}
-                        >
-                          <MaterialCommunityIcons name={selecionado ? 'checkbox-marked' : 'checkbox-blank-outline'} size={24} color={selecionado ? colors.primary : colors.text_secondary} />
-                          <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={styles.jogadorNome}>{item.nome}</Text>
-                            <Text style={styles.jogadorPosicao}>{item.posicao} • #{item.numCamisa ?? '—'}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })
+                    <View>
+                      {/* BOTÃO SELECIONAR TODOS */}
+                      <TouchableOpacity
+                        style={[styles.cardJogadorModal, { marginBottom: 12, backgroundColor: '#1a1a1a', borderColor: '#444' }]}
+                        onPress={toggleSelecionarTodos}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialCommunityIcons 
+                          name={todosSelecionados ? 'checkbox-marked' : 'checkbox-blank-outline'} 
+                          size={24} 
+                          color={todosSelecionados ? colors.primary : colors.text_secondary} 
+                        />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={[styles.jogadorNome, { color: colors.azulClaro }]}>Selecionar Todos</Text>
+                          <Text style={styles.jogadorPosicao}>
+                            {todosSelecionados ? 'Desmarcar todos os atletas' : 'Convocar todo o elenco'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <ScrollView style={{ maxHeight: 450 }} showsVerticalScrollIndicator={false}>
+                        {jogadoresDoCat.map(item => {
+                          const selecionado = !!(elencoSelecionado[wizardSubAtivo.id]?.includes(item.id));
+                          return (
+                            <TouchableOpacity
+                              key={item.id.toString()}
+                              style={[styles.cardJogadorModal, selecionado && { borderColor: colors.primary, backgroundColor: colors.primary + '11' }]}
+                              onPress={() => toggleJogadorElenco(item.id)}
+                              activeOpacity={0.7}
+                            >
+                              <MaterialCommunityIcons name={selecionado ? 'checkbox-marked' : 'checkbox-blank-outline'} size={24} color={selecionado ? colors.primary : colors.text_secondary} />
+                              <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={styles.jogadorNome}>{item.nome}</Text>
+                                <Text style={styles.jogadorPosicao}>{item.posicao} • #{item.numCamisa ?? '—'}</Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
                   )}
                   <TouchableOpacity style={[styles.btnSalvar, { marginTop: 16 }]} onPress={() => setWizardStep('SUBS')}>
                     <Text style={styles.btnSalvarTxt}>CONFIRMAR ELENCO</Text>
