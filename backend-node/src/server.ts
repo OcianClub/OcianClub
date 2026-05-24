@@ -557,6 +557,24 @@ app.post('/partidas/:id/eventos', async (req, res) => {
   } catch (error: any) { res.status(500).json({ error: 'Erro ao salvar evento' }); }
 });
 
+app.get('/partidas/:id/eventos', async (req, res) => {
+  try {
+    const eventos = await prisma.evento.findMany({
+      where: { partida_id: Number(req.params.id) },
+      include: { jogador: true },
+      orderBy: { id: 'asc' }
+    });
+    res.json(eventos);
+  } catch (error: any) { res.status(500).json({ error: 'Erro ao buscar eventos' }); }
+});
+
+app.delete('/eventos/:id', async (req, res) => {
+  try {
+    await prisma.evento.delete({ where: { id: Number(req.params.id) } });
+    res.json({ mensagem: 'Evento deletado' });
+  } catch (error: any) { res.status(500).json({ error: 'Erro ao deletar evento' }); }
+});
+
 // ==========================================
 // 4. INTEGRAÇÃO COM IA
 // ==========================================

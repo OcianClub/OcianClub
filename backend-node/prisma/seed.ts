@@ -39,53 +39,63 @@ async function main() {
     console.log("✅ Categorias de Iniciação e Base criadas/verificadas.");
 
     // ── 2. SEED DE ADMIN ───────────────────────────────────────────────
-    const hashSenha = await bcrypt.hash('adm123', 10);
+    const hashSenha = await bcrypt.hash('123456', 10);
     await prisma.usuario.upsert({
-        where: { email: 'adm@adm' },
+        where: { email: 'admin@ocian.com' },
         update: {},
         create: {
             nome: 'Administrador',
-            email: 'adm@adm',
+            email: 'admin@ocian.com',
             senha: hashSenha,
             role: Role.ADMIN,
         },
     });
-    console.log('✅ Usuário Admin verificado.');
+    console.log('✅ Usuário Admin verificado (admin@ocian.com / 123456).');
 
     // ── 3. SEED DE TESTE EM MASSA ALINHADO AO NOVO SCHEMA ──────────────
-    console.log("Gando elencos, partidas e times por sub correspondente...");
+    console.log("⚽ Gerando elencos (6 atletas), partidas e times por sub correspondente...");
 
     const todasCategorias = await prisma.categoria.findMany();
+    const anoAtual = 2026;
 
     for (const cat of todasCategorias) {
-        // Criando o registro do Ocian ESPECÍFICO para esta categoria (Garante o @@unique)
-        const ocianSub = await prisma.time.create({
-            data: { nome: "CFA Ocian", categoria_id: cat.id }
-        });
+        // Criando o registro do Ocian e Rival ESPECÍFICOS para esta categoria
+        const ocianSub = await prisma.time.create({ data: { nome: "CFA Ocian", categoria_id: cat.id } });
+        const rivalSub = await prisma.time.create({ data: { nome: "Rival FC", categoria_id: cat.id } });
 
-        // Criando o Rival ESPECÍFICO para esta categoria
-        const rivalSub = await prisma.time.create({
-            data: { nome: "Rival FC", categoria_id: cat.id }
-        });
-
-        // CPFs dinâmicos e únicos baseados no ID da categoria
+        // Cálculo do ano de nascimento adequado para a categoria no ano de 2026
+        const anoNascimento = anoAtual - cat.faixaIdade;
         const idStr = cat.id.toString().padStart(2, '0');
-        const cpf1 = `111.111.111-${idStr}`;
-        const cpf2 = `222.222.222-${idStr}`;
-        const cpf3 = `333.333.333-${idStr}`;
 
-        // Inserindo os jogadores vinculados à categoria
-        const j1 = await prisma.jogador.create({
-            data: { nome: `Marcos Artilheiro (${cat.nome})`, cpf: cpf1, dtNasc: new Date('2014-01-01'), posicao: 'Ala', categoria_id: cat.id, numCamisa: 9 }
-        });
+        // Criação de 6 jogadores com CPFs e numerações únicas
+        const jogadoresData = [
+            { nome: `Murilo Paredão (${cat.nome})`, posicao: 'Goleiro', camisa: 1,  titular: true },
+            { nome: `Felipe Fixo (${cat.nome})`,    posicao: 'Fixo',    camisa: 4,  titular: true },
+            { nome: `Jefferson Maestro (${cat.nome})`, posicao: 'Ala',   camisa: 10, titular: true },
+            { nome: `Marcos Artilheiro (${cat.nome})`, posicao: 'Pivô',  camisa: 9,  titular: true },
+            { nome: `Lucas Motorzinho (${cat.nome})`,  posicao: 'Ala',   camisa: 7,  titular: true },
+            { nome: `Gabriel Talento (${cat.nome})`,   posicao: 'Ala',   camisa: 11, titular: false } // Reserva
+        ];
 
-        const j2 = await prisma.jogador.create({
-            data: { nome: `Jefferson Maestro (${cat.nome})`, cpf: cpf2, dtNasc: new Date('2014-01-01'), posicao: 'Ala', categoria_id: cat.id, numCamisa: 10 }
-        });
+        const jogadoresCriados = [];
 
-        const j3 = await prisma.jogador.create({
-            data: { nome: `Murilo Paredão (${cat.nome})`, cpf: cpf3, dtNasc: new Date('2014-01-01'), posicao: 'Goleiro', categoria_id: cat.id, numCamisa: 1 }
-        });
+        for (let i = 0; i < jogadoresData.length; i++) {
+            const jData = jogadoresData[i];
+            const cpf = `${String(i + 1).repeat(3)}.${String(i + 1).repeat(3)}.${idStr}-00`;
+            
+            const j = await prisma.jogador.create({
+                data: { 
+                    nome: jData.nome, 
+                    cpf: cpf, 
+                    dtNasc: new Date(`${anoNascimento}-05-10`), 
+                    posicao: jData.posicao, 
+                    categoria_id: cat.id, 
+                    numCamisa: jData.camisa,
+                    ativo: true
+                }
+            });
+            jogadoresCriados.push({ jogador: j, titular: jData.titular, camisa: jData.camisa });
+        }
 
         // Criando a Partida de Teste utilizando os IDs dos times corretos do sub atual
         const partida = await prisma.partida.create({
@@ -104,31 +114,37 @@ async function main() {
             }
         });
 
-        // Criação da Súmula / Escalação da partida
+        // Criação da Súmula (5 titulares, 1 banco)
         await prisma.escalacaoPartida.createMany({
-            data: [
-                { partida_id: partida.id, jogador_id: j1.id, numCamisa: 9, titular: true },
-                { partida_id: partida.id, jogador_id: j2.id, numCamisa: 10, titular: true },
-                { partida_id: partida.id, jogador_id: j3.id, numCamisa: 1, titular: true },
-            ]
+            data: jogadoresCriados.map(jc => ({
+                partida_id: partida.id,
+                jogador_id: jc.jogador.id,
+                numCamisa: jc.camisa,
+                titular: jc.titular
+            }))
         });
 
-        // Inserção dos eventos utilizando o campo 'doOcian' (Novo Schema)
+        // Inserção dos eventos utilizando o novo campo 'periodo' em vez de 'minuto'
         await prisma.evento.createMany({
             data: [
                 // Marcos Artilheiro fez 3 Gols
-                { partida_id: partida.id, tipo: TipoEvento.GOL, minuto: 5, doOcian: true, jogador_id: j1.id },
-                { partida_id: partida.id, tipo: TipoEvento.GOL, minuto: 12, doOcian: true, jogador_id: j1.id },
-                { partida_id: partida.id, tipo: TipoEvento.GOL, minuto: 28, doOcian: true, jogador_id: j1.id },
+                { partida_id: partida.id, tipo: TipoEvento.GOL, periodo: 1, minuto: null, doOcian: true, jogador_id: jogadoresCriados[3].jogador.id },
+                { partida_id: partida.id, tipo: TipoEvento.GOL, periodo: 1, minuto: null, doOcian: true, jogador_id: jogadoresCriados[3].jogador.id },
+                { partida_id: partida.id, tipo: TipoEvento.GOL, periodo: 2, minuto: null, doOcian: true, jogador_id: jogadoresCriados[3].jogador.id },
                 
                 // Jefferson Maestro deu 2 Assistências e fez 1 Gol
-                { partida_id: partida.id, tipo: TipoEvento.ASSISTENCIA, minuto: 5, doOcian: true, jogador_id: j2.id },
-                { partida_id: partida.id, tipo: TipoEvento.ASSISTENCIA, minuto: 12, doOcian: true, jogador_id: j2.id },
-                { partida_id: partida.id, tipo: TipoEvento.GOL, minuto: 35, doOcian: true, jogador_id: j2.id },
+                { partida_id: partida.id, tipo: TipoEvento.ASSISTENCIA, periodo: 1, minuto: null, doOcian: true, jogador_id: jogadoresCriados[2].jogador.id },
+                { partida_id: partida.id, tipo: TipoEvento.ASSISTENCIA, periodo: 2, minuto: null, doOcian: true, jogador_id: jogadoresCriados[2].jogador.id },
+                { partida_id: partida.id, tipo: TipoEvento.GOL, periodo: 2, minuto: null, doOcian: true, jogador_id: jogadoresCriados[2].jogador.id },
                 
                 // Murilo Paredão fez defesas
-                { partida_id: partida.id, tipo: TipoEvento.DEFESA, minuto: 2, doOcian: true, jogador_id: j3.id },
-                { partida_id: partida.id, tipo: TipoEvento.DEFESA, minuto: 15, doOcian: true, jogador_id: j3.id },
+                { partida_id: partida.id, tipo: TipoEvento.DEFESA, periodo: 1, minuto: null, doOcian: true, jogador_id: jogadoresCriados[0].jogador.id },
+                { partida_id: partida.id, tipo: TipoEvento.DEFESA, periodo: 2, minuto: null, doOcian: true, jogador_id: jogadoresCriados[0].jogador.id },
+
+                // Faltas e Cartões para testar o esquema completo
+                { partida_id: partida.id, tipo: TipoEvento.FALTA, periodo: 1, minuto: null, doOcian: true, jogador_id: jogadoresCriados[1].jogador.id },
+                { partida_id: partida.id, tipo: TipoEvento.CARTAO_AMARELO, periodo: 2, minuto: null, doOcian: true, jogador_id: jogadoresCriados[1].jogador.id },
+                { partida_id: partida.id, tipo: TipoEvento.CARTAO_AZUL, periodo: 2, minuto: null, doOcian: true, jogador_id: jogadoresCriados[4].jogador.id },
             ]
         });
 

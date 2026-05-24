@@ -161,18 +161,13 @@ enum StatusPartida {
 // ── EVENTOS (Scout / IA) ──────────────────────────────────
 model Evento {
   id         Int        @id @default(autoincrement())
-
   partida_id Int
   partida    Partida    @relation(fields: [partida_id], references: [id], onDelete: Cascade)
-
   tipo       TipoEvento
-  minuto     Int
-
-  // doOcian = false → evento do adversário (gol sofrido, cartão do oponente)
-  // Substitui time_id, que gerava ambiguidade ao depender de um registro solto de Time
+  periodo    Int        // Salvará 1, 2, 3 ou 4 (1º, 2º, 3º ou 4º tempo)
+  minuto     Int?       // Ficará nulo por enquanto. Receberá o minuto exato quando houver cronômetro.
   doOcian    Boolean    @default(true)
-
-  jogador_id Int?       // null para eventos do adversário
+  jogador_id Int?
   jogador    Jogador?   @relation(fields: [jogador_id], references: [id])
 
   @@index([partida_id])
@@ -184,6 +179,7 @@ enum TipoEvento {
   DEFESA
   CARTAO_AMARELO
   CARTAO_VERMELHO
+  CARTAO_AZUL
   FALTA
 }
 
