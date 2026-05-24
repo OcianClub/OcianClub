@@ -92,23 +92,23 @@ enum TipoCompeticao {
 
 // ── JOGADORES (Elenco do Ocian) ───────────────────────────
 model Jogador {
-  id           Int       @id @default(autoincrement())
-  nome         String
-  cpf          String    @unique
-  dtNasc       DateTime  @db.Date
-  numCamisa    Int?
-  posicao      String
-
-  perfil_ml    String?
-  scores_ml    Json?
-  nota_geral   Float?
+  id            Int       @id @default(autoincrement())
+  nome          String
+  cpf           String    @unique
+  dtNasc        DateTime  @db.Date
+  numCamisa     Int?
+  posicao       String
+  ativo         Boolean   @default(true)
+  perfil_ml     String?
+  scores_ml     Json?
+  nota_geral    Float?
 
   categoria_id Int
-  categoria    Categoria @relation(fields: [categoria_id], references: [id])
+  categoria     Categoria @relation(fields: [categoria_id], references: [id])
 
-  competicoes  CompeticaoJogador[]
-  escalacoes   EscalacaoPartida[]
-  eventos      Evento[]
+  competicoes   CompeticaoJogador[]
+  escalacoes    EscalacaoPartida[]
+  eventos       Evento[]
 
   @@index([categoria_id])
 }

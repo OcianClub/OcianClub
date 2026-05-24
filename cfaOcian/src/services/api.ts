@@ -13,6 +13,11 @@ export async function fetchJogadoresPorCompeticao(comp_id: number): Promise<any[
   return res.json();
 }
 
+export async function atualizarIdadesJogadores(): Promise<{ atualizados: number; desativados: number }> {
+  const res = await fetch(`${BASE_URL}/admin/atualizar-idades`, { method: 'PATCH' });
+  if (!res.ok) throw new Error('Erro ao atualizar idades');
+  return res.json();
+}
 // Substitui o elenco de uma competição por completo (idempotente).
 export async function salvarElencoCompeticao(comp_id: number, jogador_ids: number[]): Promise<void> {
   const res = await fetch(`${BASE_URL}/competicoes/${comp_id}/jogadores`, {

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal,
-  TextInput, ActivityIndicator, Alert, Pressable, RefreshControl
+  TextInput, ActivityIndicator, Alert, Pressable, RefreshControl, Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Polygon, Line, Text as SvgText } from 'react-native-svg';
@@ -14,6 +14,8 @@ import { colors } from '@/src/theme/colors';
 import { Header } from '@/src/components/Header';
 import { styles as s } from '@/src/styles/ElencoSubStyles';
 
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
 interface Categoria { id: number; nome: string; }
 
 interface JogadorSimples {
@@ -23,6 +25,7 @@ interface JogadorSimples {
   numCamisa: number | null;
   categoria_id: number;
   dtNasc?: string;
+  ativo?: boolean;
 }
 
 interface ElencoSubProps {
@@ -31,6 +34,15 @@ interface ElencoSubProps {
   onFechar: () => void;
   onRecarregar: () => void;
 }
+
+// Payload retornado pelo onSalvo para o toast
+interface SalvoPayload {
+  nome: string;
+  subNome: string;
+  foiRedirecionado: boolean;
+}
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const COR_PERFIL: Record<string, string> = {
   'Artilheiro': colors.vermelho,
@@ -41,7 +53,30 @@ const COR_PERFIL: Record<string, string> = {
 
 const POSICOES = ['Ala', 'Goleiro'];
 
-function HexagonoScout({ scores, size = 200, corPerfil }: { scores: ScoresMl; size?: number; corPerfil: string }) {
+const REGRAS_SUB = [
+  { limite: 7,  nome: 'sub-7'  }, { limite: 8,  nome: 'sub-8'  },
+  { limite: 9,  nome: 'sub-9'  }, { limite: 10, nome: 'sub-10' },
+  { limite: 12, nome: 'sub-12' }, { limite: 14, nome: 'sub-14' },
+  { limite: 16, nome: 'sub-16' }, { limite: 18, nome: 'sub-18' },
+];
+
+// ─── Helper: calcula sub pela data "DD/MM/AAAA" ───────────────────────────────
+
+function calcularSubPorData(dtFormatada: string): string | null {
+  if (dtFormatada.length < 10) return null;
+  const [d, m, a] = dtFormatada.split('/');
+  if (!d || !m || !a || a.length !== 4) return null;
+  const ano = parseInt(a, 10);
+  if (isNaN(ano) || ano < 1990 || ano > new Date().getFullYear()) return null;
+  const idade = new Date().getFullYear() - ano;
+  return REGRAS_SUB.find(r => idade <= r.limite)?.nome ?? null;
+}
+
+// ─── HexagonoScout ────────────────────────────────────────────────────────────
+
+function HexagonoScout({ scores, size = 200, corPerfil }: {
+  scores: ScoresMl; size?: number; corPerfil: string;
+}) {
   const cx = size / 2, cy = size / 2, R = size * 0.34;
   const eixos = [
     { label: 'FINALIZAÇÃO', key: 'finalizacao'   },
@@ -63,7 +98,8 @@ function HexagonoScout({ scores, size = 200, corPerfil }: { scores: ScoresMl; si
   return (
     <Svg width={size} height={size}>
       {[0.33, 0.66, 1].map((f, idx) => (
-        <Polygon key={idx} points={grid(f)} fill="none" stroke={f === 1 ? '#3a3a3a' : '#252525'} strokeWidth={f === 1 ? 1.5 : 1} />
+        <Polygon key={idx} points={grid(f)} fill="none"
+          stroke={f === 1 ? '#3a3a3a' : '#252525'} strokeWidth={f === 1 ? 1.5 : 1} />
       ))}
       {eixos.map((_, i) => {
         const p = base(i, R);
@@ -83,20 +119,22 @@ function HexagonoScout({ scores, size = 200, corPerfil }: { scores: ScoresMl; si
   );
 }
 
+// ─── ModalScout ───────────────────────────────────────────────────────────────
+
 function ModalScout({ jogador, onFechar }: { jogador: JogadorScout; onFechar: () => void }) {
   const corPerfil = COR_PERFIL[jogador.perfil_ml] || '#555555';
   const idade = jogador.dtNasc ? new Date().getFullYear() - new Date(jogador.dtNasc).getFullYear() : null;
-  const golsPJ = jogador.jogos_disputados > 0 ? (jogador.gols / jogador.jogos_disputados).toFixed(2) : '—';
+  const golsPJ   = jogador.jogos_disputados > 0 ? (jogador.gols / jogador.jogos_disputados).toFixed(2) : '—';
   const assistPJ = jogador.jogos_disputados > 0 ? (jogador.assistencias / jogador.jogos_disputados).toFixed(2) : '—';
 
   const stats = [
-    { label: 'Jogos',     valor: jogador.jogos_disputados, icone: 'soccer-field'  },
-    { label: 'Gols',      valor: jogador.gols,             icone: 'soccer'        },
-    { label: 'Assist.',   valor: jogador.assistencias,     icone: 'handshake'     },
-    { label: 'Defesas',   valor: jogador.defesas ?? 0,     icone: 'shield-check'  },
-    { label: 'Faltas',    valor: jogador.faltas_cometidas, icone: 'whistle'       },
-    { label: 'Amarelos',  valor: jogador.cartoes_amarelos, icone: 'card'          },
-    { label: 'Vermelhos', valor: jogador.cartoes_vermelhos,icone: 'card'          },
+    { label: 'Jogos',     valor: jogador.jogos_disputados,  icone: 'soccer-field' },
+    { label: 'Gols',      valor: jogador.gols,              icone: 'soccer'       },
+    { label: 'Assist.',   valor: jogador.assistencias,      icone: 'handshake'    },
+    { label: 'Defesas',   valor: jogador.defesas ?? 0,      icone: 'shield-check' },
+    { label: 'Faltas',    valor: jogador.faltas_cometidas,  icone: 'whistle'      },
+    { label: 'Amarelos',  valor: jogador.cartoes_amarelos,  icone: 'card'         },
+    { label: 'Vermelhos', valor: jogador.cartoes_vermelhos, icone: 'card'         },
   ];
 
   return (
@@ -112,13 +150,8 @@ function ModalScout({ jogador, onFechar }: { jogador: JogadorScout; onFechar: ()
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scoutScroll}>
           <View style={[s.identidadeCard, { borderColor: corPerfil + '60' }]}>
-            <LinearGradient 
-                colors={[corPerfil, 'transparent']}
-              style={s.avatarGradient}
-            >
-              <Text style={[s.avatarNum, { color: corPerfil }]}>
-                {jogador.numCamisa ?? '?'}
-              </Text>
+            <LinearGradient colors={[corPerfil, 'transparent']} style={s.avatarGradient}>
+              <Text style={[s.avatarNum, { color: corPerfil }]}>{jogador.numCamisa ?? '?'}</Text>
             </LinearGradient>
 
             <View style={{ flex: 1, gap: 4 }}>
@@ -131,11 +164,7 @@ function ModalScout({ jogador, onFechar }: { jogador: JogadorScout; onFechar: ()
                 <View style={s.chip}>
                   <Text style={s.chipTxt}>{jogador.categoria}</Text>
                 </View>
-                {idade && (
-                  <View style={s.chip}>
-                    <Text style={s.chipTxt}>{idade} anos</Text>
-                  </View>
-                )}
+                {idade && <View style={s.chip}><Text style={s.chipTxt}>{idade} anos</Text></View>}
               </View>
             </View>
 
@@ -196,26 +225,34 @@ function ModalScout({ jogador, onFechar }: { jogador: JogadorScout; onFechar: ()
               <Text style={s.eficienciaLabel}>Assist./Jogo</Text>
             </View>
           </View>
-
         </ScrollView>
       </View>
     </Modal>
   );
 }
 
+// ─── ModalFormJogador ─────────────────────────────────────────────────────────
+
 function ModalFormJogador({
-  visivel, jogador, onFechar, onSalvo,
+  visivel,
+  jogador,
+  categoriaAtualId,
+  categoriaAtualNome,   // ← NOVO: nome do sub atual (ex: "sub-10")
+  onFechar,
+  onSalvo,
 }: {
   visivel: boolean;
   jogador: JogadorSimples | null;
+  categoriaAtualId: number;
+  categoriaAtualNome: string;
   onFechar: () => void;
-  onSalvo: () => void;
+  onSalvo: (payload: SalvoPayload) => void;  // ← agora retorna dados pro toast
 }) {
-  const [nome,     setNome]    = useState('');
-  const [cpf,      setCpf]     = useState('');
-  const [dtNasc,   setDtNasc]  = useState('');
-  const [posicao,  setPosicao] = useState('Ala');
-  const [camisa,   setCamisa]  = useState('');
+  const [nome,     setNome]     = useState('');
+  const [cpf,      setCpf]      = useState('');
+  const [dtNasc,   setDtNasc]   = useState('');
+  const [posicao,  setPosicao]  = useState('Ala');
+  const [camisa,   setCamisa]   = useState('');
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -225,60 +262,93 @@ function ModalFormJogador({
     setCpf('');
 
     if (jogador?.dtNasc) {
-      const dataFatiada = jogador.dtNasc.slice(0, 10); // "2014-01-21"
-      const [ano, mes, dia] = dataFatiada.split('-'); // Separa pelo traço
-      setDtNasc(`${dia}/${mes}/${ano}`); // Junta no formato BR perfeito
+      const fatiada = jogador.dtNasc.slice(0, 10);
+      const [ano, mes, dia] = fatiada.split('-');
+      setDtNasc(`${dia}/${mes}/${ano}`);
     } else {
       setDtNasc('');
     }
   }, [jogador, visivel]);
 
+  // ── Preview do sub calculado em tempo real ────────────────────────────────
+  const subCalculado = calcularSubPorData(dtNasc);
+  const subDiferente =
+    subCalculado !== null &&
+    subCalculado.toLowerCase() !== categoriaAtualNome.toLowerCase();
+
+  // ── Formatters ────────────────────────────────────────────────────────────
+
   const formatarCPF = (v: string) => {
     const n = v.replace(/\D/g, '').slice(0, 11);
-    return n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-            .replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3')
-            .replace(/(\d{3})(\d{3})/, '$1.$2')
-            .replace(/(\d{3})/, '$1');
+    if (n.length > 9) return `${n.slice(0, 3)}.${n.slice(3, 6)}.${n.slice(6, 9)}-${n.slice(9)}`;
+    if (n.length > 6) return `${n.slice(0, 3)}.${n.slice(3, 6)}.${n.slice(6)}`;
+    if (n.length > 3) return `${n.slice(0, 3)}.${n.slice(3)}`;
+    return n;
   };
 
-const formatarData = (v: string) => {
-    let n = v.replace(/\D/g, '').slice(0, 8);
-    if (n.length >= 5) {
-      return `${n.slice(0, 2)}/${n.slice(2, 4)}/${n.slice(4)}`;
-    } else if (n.length >= 3) {
-      return `${n.slice(0, 2)}/${n.slice(2)}`;
-    }
+  const formatarData = (v: string) => {
+    const n = v.replace(/\D/g, '').slice(0, 8);
+    if (n.length >= 5) return `${n.slice(0, 2)}/${n.slice(2, 4)}/${n.slice(4)}`;
+    if (n.length >= 3) return `${n.slice(0, 2)}/${n.slice(2)}`;
     return n;
   };
 
   const dataParaISO = (v: string): string => {
     const [d, m, a] = v.split('/');
-    // Garante zero-padding: "1/1/2019" → "2019-01-01"
-    const pad = (n: string) => n.padStart(2, '0');
+    const pad = (x: string) => x.padStart(2, '0');
     return `${a}-${pad(m)}-${pad(d)}`;
   };
 
+  // ── Salvar ────────────────────────────────────────────────────────────────
+
   const salvar = async () => {
     if (!nome.trim()) return Alert.alert('Atenção', 'Informe o nome do atleta.');
-    if (!jogador && !cpf.trim()) return Alert.alert('Atenção', 'CPF é obrigatório.');
-    if (!dtNasc.trim()) return Alert.alert('Atenção', 'Data de nascimento é obrigatória.');
+
+    // Validação de CPF: obrigatório na criação, 11 dígitos
+    if (!jogador) {
+      const cpfLimpo = cpf.replace(/\D/g, '');
+      if (!cpfLimpo) return Alert.alert('Atenção', 'CPF é obrigatório para cadastrar um atleta.');
+      if (cpfLimpo.length !== 11) return Alert.alert('Atenção', 'CPF inválido. Digite os 11 dígitos.');
+    }
+
+    if (!dtNasc.trim() || dtNasc.length < 10)
+      return Alert.alert('Atenção', 'Data de nascimento inválida. Use o formato DD/MM/AAAA.');
 
     setSalvando(true);
     try {
       const dtISO = dataParaISO(dtNasc);
+
       if (jogador) {
-        await atualizarJogador(jogador.id, {
+        // ── EDIÇÃO ──
+        const atualizado = await atualizarJogador(jogador.id, {
           nome,
           posicao,
           numCamisa: camisa ? Number(camisa) : null,
           dtNasc: dtISO,
         });
+        onFechar();
+        onSalvo({
+          nome,
+          subNome: atualizado.categoria?.nome ?? '',
+          foiRedirecionado: atualizado.categoria_id !== jogador.categoria_id,
+        });
       } else {
+        // ── CRIAÇÃO ──
         const cpfLimpo = cpf.replace(/\D/g, '');
-        await criarJogador({ nome, cpf: cpfLimpo, dtNasc: dtISO, posicao, numCamisa: camisa ? Number(camisa) : undefined });
+        const criado = await criarJogador({
+          nome,
+          cpf: cpfLimpo,
+          dtNasc: dtISO,
+          posicao,
+          numCamisa: camisa ? Number(camisa) : undefined,
+        });
+        onFechar();
+        onSalvo({
+          nome,
+          subNome: criado.categoria?.nome ?? '',
+          foiRedirecionado: criado.categoria_id !== categoriaAtualId,
+        });
       }
-      onSalvo();
-      onFechar();
     } catch (e: any) {
       Alert.alert('Erro', e.message);
     } finally {
@@ -297,32 +367,89 @@ const formatarData = (v: string) => {
             </TouchableOpacity>
           </View>
 
+          {/* Nome */}
           <View style={s.inputRow}>
             <MaterialCommunityIcons name="account-outline" size={18} color={colors.text_secondary} />
-            <TextInput style={s.input} placeholder="Nome completo" placeholderTextColor={colors.text_secondary}
-              value={nome} onChangeText={setNome} autoCapitalize="words" />
+            <TextInput
+              style={s.input}
+              placeholder="Nome completo"
+              placeholderTextColor={colors.text_secondary}
+              value={nome}
+              onChangeText={setNome}
+              autoCapitalize="words"
+            />
           </View>
 
+          {/* CPF — só na criação */}
           {!jogador && (
             <View style={s.inputRow}>
               <MaterialCommunityIcons name="card-account-details-outline" size={18} color={colors.text_secondary} />
-              <TextInput style={s.input} placeholder="CPF" placeholderTextColor={colors.text_secondary}
-                value={cpf} onChangeText={v => setCpf(formatarCPF(v))} keyboardType="numeric" />
+              <TextInput
+                style={s.input}
+                placeholder="CPF obrigatório (somente números)"
+                placeholderTextColor={colors.text_secondary}
+                value={cpf}
+                onChangeText={v => setCpf(formatarCPF(v))}
+                keyboardType="number-pad"
+                maxLength={14}
+              />
             </View>
           )}
 
+          {/* Data de nascimento */}
           <View style={s.inputRow}>
             <MaterialCommunityIcons name="calendar-outline" size={18} color={colors.text_secondary} />
-            <TextInput style={s.input} placeholder="Data nasc. (DD/MM/AAAA)" placeholderTextColor={colors.text_secondary}
-              value={dtNasc} onChangeText={v => setDtNasc(formatarData(v))} keyboardType="numeric" maxLength={10} />
+            <TextInput
+              style={s.input}
+              placeholder="Data nasc. (DD/MM/AAAA)"
+              placeholderTextColor={colors.text_secondary}
+              value={dtNasc}
+              onChangeText={v => setDtNasc(formatarData(v))}
+              keyboardType="number-pad"
+              maxLength={10}
+            />
           </View>
 
+          {/* ── Preview do sub calculado ───────────────────────────────────
+               Aparece assim que a data tiver 10 caracteres válidos.
+               Verde = mesmo sub | Amarelo = vai para outro sub          */}
+          {subCalculado && (
+            <View style={[
+              s.infoBox,
+              {
+                backgroundColor: subDiferente ? colors.amarelo + '18' : colors.primary + '18',
+                borderColor:     subDiferente ? colors.amarelo + '70' : colors.primary + '70',
+                marginBottom: 12,
+              },
+            ]}>
+              <MaterialCommunityIcons
+                name={subDiferente ? 'alert-circle-outline' : 'check-circle-outline'}
+                size={15}
+                color={subDiferente ? colors.amarelo : colors.primary}
+              />
+              <Text style={[s.infoTxt, { color: subDiferente ? colors.amarelo : colors.primary }]}>
+                {subDiferente
+                  ? `Pela data de nascimento, este atleta será cadastrado no ${subCalculado.toUpperCase()} — não no ${categoriaAtualNome.toUpperCase()}.`
+                  : `Atleta dentro da faixa etária do ${subCalculado.toUpperCase()}. ✓`}
+              </Text>
+            </View>
+          )}
+
+          {/* Nº Camisa */}
           <View style={s.inputRow}>
             <MaterialCommunityIcons name="tshirt-crew-outline" size={18} color={colors.text_secondary} />
-            <TextInput style={s.input} placeholder="Nº camisa (opcional)" placeholderTextColor={colors.text_secondary}
-              value={camisa} onChangeText={setCamisa} keyboardType="numeric" maxLength={2} />
+            <TextInput
+              style={s.input}
+              placeholder="Nº camisa (opcional)"
+              placeholderTextColor={colors.text_secondary}
+              value={camisa}
+              onChangeText={setCamisa}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
           </View>
 
+          {/* Posição */}
           <Text style={s.formLabel}>POSIÇÃO</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, marginTop: 8 }}>
             {POSICOES.map(p => (
@@ -341,6 +468,7 @@ const formatarData = (v: string) => {
             ))}
           </View>
 
+          {/* Aviso de recálculo no modo edição */}
           {jogador && (
             <View style={s.infoBox}>
               <MaterialCommunityIcons name="information-outline" size={14} color={colors.azulClaro} />
@@ -350,7 +478,12 @@ const formatarData = (v: string) => {
             </View>
           )}
 
-          <TouchableOpacity style={s.btnSalvar} onPress={salvar} disabled={salvando} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={s.btnSalvar}
+            onPress={salvar}
+            disabled={salvando}
+            activeOpacity={0.85}
+          >
             {salvando
               ? <ActivityIndicator color="#FFF" />
               : <Text style={s.btnSalvarTxt}>SALVAR ATLETA</Text>
@@ -362,6 +495,8 @@ const formatarData = (v: string) => {
   );
 }
 
+// ─── CardAtleta ───────────────────────────────────────────────────────────────
+
 function CardAtleta({ jogador, scout, onVerFicha, onEditar, onExcluir }: {
   jogador: JogadorSimples;
   scout: JogadorScout | null;
@@ -369,14 +504,19 @@ function CardAtleta({ jogador, scout, onVerFicha, onEditar, onExcluir }: {
   onEditar: () => void;
   onExcluir: () => void;
 }) {
-  const perfil = scout?.perfil_ml || 'Sem dados';
+  const perfil    = scout?.perfil_ml || 'Sem dados';
   const corPerfil = COR_PERFIL[perfil] || '#555555';
-  const nota = scout?.nota_geral ?? 0;
+  const nota      = scout?.nota_geral ?? 0;
+  const inativo   = jogador.ativo === false;
 
   return (
-    <TouchableOpacity style={s.cardAtleta} onPress={onVerFicha} activeOpacity={0.85}>
-      <View style={[s.camisaBox, { borderColor: corPerfil + '80' }]}>
-        <Text style={[s.camisaTxt, { color: corPerfil }]}>
+    <TouchableOpacity
+      style={[s.cardAtleta, inativo && { opacity: 0.5 }]}
+      onPress={onVerFicha}
+      activeOpacity={0.85}
+    >
+      <View style={[s.camisaBox, { borderColor: inativo ? '#333' : corPerfil + '80' }]}>
+        <Text style={[s.camisaTxt, { color: inativo ? '#555' : corPerfil }]}>
           {jogador.numCamisa != null ? `#${jogador.numCamisa}` : '—'}
         </Text>
       </View>
@@ -386,20 +526,29 @@ function CardAtleta({ jogador, scout, onVerFicha, onEditar, onExcluir }: {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
           <MaterialCommunityIcons
             name={jogador.posicao === 'Goleiro' ? 'hand-front-right' : 'run-fast'}
-            size={11}
-            color={colors.text_secondary}
+            size={11} color={colors.text_secondary}
           />
           <Text style={s.cardSub}>{jogador.posicao}</Text>
+          {inativo && (
+            <View style={{
+              backgroundColor: '#2a2a2a', borderRadius: 4,
+              paddingHorizontal: 5, paddingVertical: 1,
+            }}>
+              <Text style={{ color: '#666', fontSize: 9, fontFamily: 'Creato-Bold' }}>SÊNIOR</Text>
+            </View>
+          )}
         </View>
       </View>
 
       <View style={s.cardDireita}>
-        {perfil !== 'Sem dados' && (
+        {perfil !== 'Sem dados' && !inativo && (
           <View style={[s.badgePerfil, { backgroundColor: corPerfil + '18', borderColor: corPerfil + '50' }]}>
             <Text style={[s.badgePerfilTxt, { color: corPerfil }]}>{perfil}</Text>
           </View>
         )}
-        {nota > 0 && <Text style={[s.notaTxt, { color: corPerfil }]}>{nota.toFixed(0)}</Text>}
+        {nota > 0 && !inativo && (
+          <Text style={[s.notaTxt, { color: corPerfil }]}>{nota.toFixed(0)}</Text>
+        )}
       </View>
 
       <View style={s.acoes}>
@@ -414,8 +563,10 @@ function CardAtleta({ jogador, scout, onVerFicha, onEditar, onExcluir }: {
   );
 }
 
+// ─── ElencoSub (componente principal) ────────────────────────────────────────
+
 export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar }: ElencoSubProps) {
-  const [scouts,             setScouts]           = useState<JogadorScout[]>([]);
+  const [scouts,           setScouts]           = useState<JogadorScout[]>([]);
   const [carregandoScout,  setCarregandoScout]  = useState(true);
   const [refreshing,       setRefreshing]       = useState(false);
   const [modalForm,        setModalForm]        = useState(false);
@@ -426,6 +577,17 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
   const [excluindo,        setExcluindo]        = useState(false);
   const [busca,            setBusca]            = useState('');
   const [filtroPosicao,    setFiltroPosicao]    = useState<'Todos' | 'Ala' | 'Goleiro'>('Todos');
+  const [mostrarSenior,    setMostrarSenior]    = useState(false);
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState<{ msg: string; tipo: 'sucesso' | 'aviso' } | null>(null);
+
+  const mostrarToast = useCallback((msg: string, tipo: 'sucesso' | 'aviso' = 'sucesso') => {
+    setToast({ msg, tipo });
+    setTimeout(() => setToast(null), 3800);
+  }, []);
+
+  // ── Scouts ──────────────────────────────────────────────────────────────────
 
   const carregarScouts = useCallback(async () => {
     setCarregandoScout(true);
@@ -449,11 +611,20 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
 
   const getScout = (id: number) => scouts.find(sc => sc.id_jogador === id) ?? null;
 
-  const jogadoresFiltrados = jogadores.filter(j => {
-    const matchBusca   = j.nome.toLowerCase().includes(busca.toLowerCase());
-    const matchPosicao = filtroPosicao === 'Todos' || j.posicao === filtroPosicao;
-    return matchBusca && matchPosicao;
-  });
+  // ── Filtros ────────────────────────────────────────────────────────────────
+  // FIX: ativosFiltrados e seniorsFiltrados estavam sendo usados sem serem definidos.
+
+  const filtrar = (lista: JogadorSimples[]) =>
+    lista.filter(j => {
+      const matchBusca   = j.nome.toLowerCase().includes(busca.toLowerCase());
+      const matchPosicao = filtroPosicao === 'Todos' || j.posicao === filtroPosicao;
+      return matchBusca && matchPosicao;
+    });
+
+  const ativosFiltrados  = filtrar(jogadores.filter(j => j.ativo !== false));
+  const seniorsFiltrados = filtrar(jogadores.filter(j => j.ativo === false));
+
+  // ── Ações ──────────────────────────────────────────────────────────────────
 
   const abrirFicha = (jogador: JogadorSimples) => {
     const scout = getScout(jogador.id);
@@ -485,20 +656,33 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
     }
   };
 
-  const totalAlas     = jogadores.filter(j => j.posicao === 'Ala').length;
-  const totalGoleiros = jogadores.filter(j => j.posicao === 'Goleiro').length;
+  // ── Callback do formulário ─────────────────────────────────────────────────
+
+  const handleSalvo = useCallback(({ nome, subNome, foiRedirecionado }: SalvoPayload) => {
+    onRecarregar();
+    carregarScouts();
+    if (foiRedirecionado) {
+      mostrarToast(
+        `⚠️ ${nome} foi para o ${subNome.toUpperCase()} pela data de nascimento`,
+        'aviso',
+      );
+    } else {
+      mostrarToast(`✓ ${nome} adicionado com sucesso`, 'sucesso');
+    }
+  }, [onRecarregar, carregarScouts, mostrarToast]);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <View style={s.container}>
       <Header
         title={categoria.nome.toUpperCase()}
-        showLogo={false}
-        showProfile={false}
-        btnVoltar="arrow-left"
-        onBtnVoltar={onFechar}
+        showLogo={false} showProfile={false}
+        btnVoltar="arrow-left" onBtnVoltar={onFechar}
         semSafeArea={true}
       />
 
+      {/* Busca */}
       <View style={s.topRow}>
         <View style={s.buscaContainer}>
           <MaterialCommunityIcons name="magnify" size={16} color={colors.text_secondary} />
@@ -517,6 +701,7 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         </View>
       </View>
 
+      {/* Filtros de posição + contador */}
       <View style={s.filtrosRow}>
         <View style={s.filtrosPills}>
           {(['Todos', 'Ala', 'Goleiro'] as const).map(p => (
@@ -536,7 +721,9 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
             <Text style={s.scoutLoadingTxt}>Carregando...</Text>
           </View>
         ) : (
-          <Text style={s.counterTxt}>{jogadoresFiltrados.length} atleta{jogadoresFiltrados.length !== 1 ? 's' : ''}</Text>
+          <Text style={s.counterTxt}>
+            {ativosFiltrados.length} atleta{ativosFiltrados.length !== 1 ? 's' : ''}
+          </Text>
         )}
       </View>
 
@@ -545,7 +732,8 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         contentContainerStyle={s.lista}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {jogadoresFiltrados.length === 0 ? (
+        {/* ── Atletas ativos ── */}
+        {ativosFiltrados.length === 0 ? (
           <View style={s.emptyContainer}>
             <MaterialCommunityIcons name="account-group-outline" size={60} color="#222" />
             <Text style={s.emptyTxt}>
@@ -553,7 +741,7 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
             </Text>
           </View>
         ) : (
-          jogadoresFiltrados.map(j => (
+          ativosFiltrados.map(j => (
             <CardAtleta
               key={j.id}
               jogador={j}
@@ -564,9 +752,44 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
             />
           ))
         )}
+
+        {/* ── Seção sênior (colapsável) ── */}
+        {seniorsFiltrados.length > 0 && (
+          <View style={{ marginTop: 24 }}>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                paddingVertical: 10, paddingHorizontal: 4,
+              }}
+              onPress={() => setMostrarSenior(v => !v)}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons
+                name={mostrarSenior ? 'chevron-down' : 'chevron-right'}
+                size={18} color="#555"
+              />
+              <Text style={{ fontFamily: 'Creato-Bold', color: '#555', fontSize: 11, letterSpacing: 1 }}>
+                SÊNIOR / HISTÓRICO ({seniorsFiltrados.length})
+              </Text>
+            </TouchableOpacity>
+
+            {mostrarSenior && seniorsFiltrados.map(j => (
+              <CardAtleta
+                key={j.id}
+                jogador={j}
+                scout={getScout(j.id)}
+                onVerFicha={() => abrirFicha(j)}
+                onEditar={() => { setJogadorEditando(j); setModalForm(true); }}
+                onExcluir={() => confirmarExclusao(j)}
+              />
+            ))}
+          </View>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {/* FAB */}
       <TouchableOpacity
         style={s.fab}
         onPress={() => { setJogadorEditando(null); setModalForm(true); }}
@@ -575,17 +798,64 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
       </TouchableOpacity>
 
+      {/* ── Toast ────────────────────────────────────────────────────────────
+           Aparece na parte de baixo da tela com feedback do cadastro.
+           Verde = mesmo sub | Amarelo = foi redirecionado             */}
+      {toast && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            bottom: 96,
+            left: 16,
+            right: 16,
+            backgroundColor: toast.tipo === 'aviso' ? '#1a1400' : '#001a0a',
+            borderWidth: 1,
+            borderColor: toast.tipo === 'aviso' ? colors.amarelo + '80' : colors.primary + '80',
+            borderRadius: 12,
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            shadowColor: '#000',
+            shadowOpacity: 0.4,
+            shadowRadius: 8,
+            elevation: 8,
+          }}
+        >
+          <MaterialCommunityIcons
+            name={toast.tipo === 'aviso' ? 'alert-circle-outline' : 'check-circle-outline'}
+            size={22}
+            color={toast.tipo === 'aviso' ? colors.amarelo : colors.primary}
+          />
+          <Text style={{
+            flex: 1,
+            color: toast.tipo === 'aviso' ? colors.amarelo : colors.primary,
+            fontSize: 13,
+            fontFamily: 'Creato-Bold',
+            lineHeight: 18,
+          }}>
+            {toast.msg}
+          </Text>
+        </View>
+      )}
+
+      {/* Modal formulário */}
       <ModalFormJogador
         visivel={modalForm}
         jogador={jogadorEditando}
+        categoriaAtualId={categoria.id}
+        categoriaAtualNome={categoria.nome}
         onFechar={() => setModalForm(false)}
-        onSalvo={() => { onRecarregar(); carregarScouts(); }}
+        onSalvo={handleSalvo}
       />
 
+      {/* Modal scout */}
       {jogadorScout && (
         <ModalScout jogador={jogadorScout} onFechar={() => setJogadorScout(null)} />
       )}
 
+      {/* Modal confirmar exclusão */}
       <Modal visible={modalConfirmar} transparent animationType="fade">
         <Pressable style={s.overlay} onPress={() => setModalConfirmar(false)}>
           <View style={s.confirmCard}>

@@ -10,6 +10,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import ElencoSub from '@/src/components/ElencoSub';
 import OrganizarPartidaCampeonato from '@/src/components/organizarPartidaCampeonato';
 import DetalhesCompeticao from '@/src/components/detalhesCompeticao';
+import * as SecureStore from 'expo-secure-store';
+import { atualizarIdadesJogadores } from '@/src/services/api';
+
 
 import {
   BASE_URL,
@@ -98,6 +101,15 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
 
   const carregarDados = useCallback(async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
+    // dentro de carregarDados, antes do try:
+    const anoAtual = String(new Date().getFullYear());
+    const ultimaAtualizacao = await SecureStore.getItemAsync('ultimaAtualizacaoIdades');
+    if (ultimaAtualizacao !== anoAtual) {
+      try {
+        await atualizarIdadesJogadores();
+        await SecureStore.setItemAsync('ultimaAtualizacaoIdades', anoAtual);
+      } catch { /* silencioso — não bloqueia o carregamento */ }
+    }
     try {
       const [t, c, cat, jog, p] = await Promise.all([
         fetchTimes(), fetchCompeticoes(), fetchCategorias(), fetchJogadores(), fetchPartidas()
