@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
-// export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000' ;
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ocianclub-node.onrender.com';
+export const BASE_URL = 'http://10.0.2.2:3000';
+// export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ocianclub-node.onrender.com';
 
 async function getToken() {
   return await SecureStore.getItemAsync('userToken');
@@ -182,12 +182,19 @@ export async function fetchPartidas(params?: {
   status?: string;
 }) {
   const query = new URLSearchParams();
-  if (params?.categoria_id) query.append('categoria_id', String(params.categoria_id));
-  if (params?.mes) query.append('mes', String(params.mes));
-  if (params?.status) query.append('status', params.status);
+  if (params?.categoria_id != null) query.append('categoria_id', String(params.categoria_id));
+  if (params?.mes          != null) query.append('mes',          String(params.mes));
+  if (params?.status)               query.append('status',       params.status);
 
-  const res = await fetch(`${BASE_URL}/partidas?${query.toString()}`);
-  if (!res.ok) throw new Error('Erro ao buscar partidas');
+  const url = `${BASE_URL}/partidas?${query.toString()}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    const corpo = await res.text().catch(() => '');
+    console.error(`[fetchPartidas] ${res.status} ${res.statusText} — ${url}\n`, corpo);
+    throw new Error(`Erro ao buscar partidas (${res.status}): ${corpo || res.statusText}`);
+  }
+
   return res.json();
 }
 
@@ -292,6 +299,55 @@ export async function salvarEscalacaoPartida(
     throw new Error(e.error || 'Erro ao salvar escalação');
   }
 }
+
+export interface ClassificacaoItem {
+  grupo: string;
+  posicao: number;
+  clube: string;
+  pontos: number;
+  jogos: number;
+  vitorias: number;
+  empates: number;
+  derrotas: number;
+  golsPro: number;
+  golsContra: number;
+  saldo: number;
+  average: number;
+  mediaGolsMarcados: number;
+  mediaGolsSofridos: number;
+  indiceTecnico: number;
+  destaque: boolean;
+}
+ 
+export interface FiltrosCampeonato {
+  temporada: string; // "2026"
+  titulo: string;    // "paulista"
+  divisao: string;   // "a1" | "a2" | "a3"
+  categoria: string; // "sub12" | "sub14" etc.
+}
+ 
+export async function fetchClassificacaoCampeonato(
+  filtros: FiltrosCampeonato,
+): Promise<ClassificacaoItem[]> {
+  const params = new URLSearchParams({
+    temporada: filtros.temporada,
+    titulo:    filtros.titulo,
+    divisao:   filtros.divisao,
+    categoria: filtros.categoria,
+  });
+
+  const res = await fetch(`${BASE_URL}/campeonato/classificacao?${params}`);
+  
+  if (!res.ok) {
+    const body = await res.text().catch(() => '(sem body)');
+    throw new Error(`[${res.status}] ${body}`);  // ← mostra status + body real
+  }
+
+  const json = await res.json();
+  return Array.isArray(json) ? json : json.data ?? [];
+}
+
+
 
 /**
  * Busca jogadores disponíveis para escalar em uma partida.

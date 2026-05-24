@@ -6,8 +6,9 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
-import importacaoRoutes from './router/importacao.routes';
+import importacaoRoutes from './routes/importacao.routes';
 import 'dotenv/config';
+import campeonatoRoutes from './routes/campeonato.routes';
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +19,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/partidas/importar', importacaoRoutes);
+app.use('/campeonato', campeonatoRoutes);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo_super_seguro_ocian';
 const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://localhost:8000';
@@ -142,6 +144,16 @@ app.get('/competicoes', async (req, res) => {
     const competicoes = await prisma.competicao.findMany({ orderBy: { nome: 'asc' } });
     res.json(competicoes);
   } catch (error: any) { res.status(500).json({ error: 'Erro ao buscar competições' }); }
+});
+
+app.get('/campeonato/sincronizar-todos', async (_req, res) => {
+  try {
+    const { sincronizarTodos } = require('./services/campeonato.service');
+    await sincronizarTodos();
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.delete('/competicoes/:id', async (req, res) => {

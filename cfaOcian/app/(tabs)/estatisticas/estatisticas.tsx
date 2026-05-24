@@ -297,6 +297,9 @@ function ModalScout({ jogador, onFechar }: { jogador: Jogador; onFechar: () => v
   );
 }
 
+const normalizarCategoria = (s: string | undefined | null) =>
+  (s ?? '').toLowerCase().replace(/\s+/g, '-');
+
 // ── Tela Principal ────────────────────────────────────────────────────────────
 export default function Estatisticas() {
   const [jogadores, setJogadores]       = useState<Jogador[]>([]);
@@ -325,9 +328,12 @@ export default function Estatisticas() {
 
         // Acha o índice do sub no carrossel que bate com a categoria do primeiro jogador
         const subsDoTipo = primeiro.categoria_tipo === 'INICIACAO' ? SUBS_INICIACAO : SUBS_BASE;
+        
+        // 2. CORREÇÃO AQUI: Usamos a função segura que previne o erro do toLowerCase()
         const idxSub = subsDoTipo.findIndex(s =>
-          s.title.toLowerCase().replace(/\s+/g, '-') === primeiro.categoria.toLowerCase()
+          normalizarCategoria(s.title) === normalizarCategoria(primeiro.categoria)
         );
+        
         if (idxSub >= 0) setSubIndex(idxSub);
       }
     } catch (e: any) {
@@ -339,16 +345,12 @@ export default function Estatisticas() {
 
   useFocusEffect(useCallback(() => { carregarDados(); }, [carregarDados]));
 
-  // Normaliza para comparação: "Sub 7" → "sub-7", "sub-7" → "sub-7"
-  const normalizarCategoria = (s: string) =>
-    s.toLowerCase().replace(/\s+/g, '-');
-
   const jogadoresFiltrados = jogadores.filter(j => {
     const matchCategoria = normalizarCategoria(j.categoria) === normalizarCategoria(categoriaAtual);
-    const matchTipo      = j.categoria_tipo === tipoAtivo;
+    const matchTipo      = (j.categoria_tipo ?? '') === tipoAtivo;
     const matchBusca     = busca === '' ||
-      j.nome.toLowerCase().includes(busca.toLowerCase()) ||
-      j.posicao.toLowerCase().includes(busca.toLowerCase());
+      (j.nome ?? '').toLowerCase().includes(busca.toLowerCase()) ||
+      (j.posicao ?? '').toLowerCase().includes(busca.toLowerCase());
     return matchCategoria && matchTipo && matchBusca;
   });
 
