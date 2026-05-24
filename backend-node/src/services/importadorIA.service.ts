@@ -298,8 +298,8 @@ console.timeEnd('prisma-insert');
   // ── 8. Insert em lote ─────────────────────────────────────────────────────
   if (insertsPartida.length > 0) {
     await prisma.partida.createMany({
-      data: insertsPartida,
-      skipDuplicates: true, // segurança extra para a constraint @@unique
+      data: insertsPartida as any,
+      skipDuplicates: true,
     });
   }
 
