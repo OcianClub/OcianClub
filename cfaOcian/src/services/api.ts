@@ -3,6 +3,9 @@ import * as SecureStore from 'expo-secure-store';
 export const BASE_URL = 'http://192.168.7.2:3000';
 // export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ocianclub-node.onrender.com';
 
+// // export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000' ;
+// export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ocianclub-node.onrender.com';
+
 async function getToken() {
   return await SecureStore.getItemAsync('userToken');
 }
@@ -12,7 +15,12 @@ export async function fetchJogadoresPorCompeticao(comp_id: number): Promise<any[
   if (!res.ok) throw new Error('Erro ao buscar elenco do campeonato');
   return res.json();
 }
-
+export async function atualizarIdadesJogadores(): Promise<{ atualizados: number; desativados: number }> {
+  const res = await fetch(`${BASE_URL}/admin/atualizar-idades`, { method: 'PATCH' });
+  if (!res.ok) throw new Error('Erro ao atualizar idades');
+  return res.json();
+}
+// Substitui o elenco de uma competição por completo (idempotente).
 export async function salvarElencoCompeticao(comp_id: number, jogador_ids: number[]): Promise<void> {
   const res = await fetch(`${BASE_URL}/competicoes/${comp_id}/jogadores`, {
     method: 'PUT',
@@ -233,7 +241,8 @@ export async function atualizarPlacarPartida(id: number, gols_mandante: number, 
 
 export async function criarEvento(partida_id: number, dados: {
   tipo: string;
-  minuto: number;
+  minuto?: number | null;
+  periodo?: number | null;
   jogador_id?: number | null;
   doOcian?: boolean;
 }) {
@@ -245,6 +254,24 @@ export async function criarEvento(partida_id: number, dados: {
   if (!res.ok) throw new Error('Erro ao criar evento');
   return res.json();
 }
+
+// src/services/api.ts
+export const fetchEventosDaPartida = async (partidaId: number) => {
+  const response = await fetch(`${BASE_URL}/partidas/${partidaId}/eventos`);
+  if (!response.ok) throw new Error('Falha ao buscar eventos');
+  return await response.json();
+};
+
+export const deletarEvento = async (eventoId: number) => {
+  const response = await fetch(`${BASE_URL}/eventos/${eventoId}`, { 
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) throw new Error('Falha ao deletar evento');
+  return await response.json();
+};
 
 // ── ESCALAÇÃO ──────────────────────────────────────────────────────────────
 

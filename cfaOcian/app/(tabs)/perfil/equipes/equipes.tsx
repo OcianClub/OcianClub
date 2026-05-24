@@ -10,6 +10,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import ElencoSub from '@/src/components/ElencoSub';
 import OrganizarPartidaCampeonato from '@/src/components/organizarPartidaCampeonato';
 import DetalhesCompeticao from '@/src/components/detalhesCompeticao';
+import * as SecureStore from 'expo-secure-store';
+import { atualizarIdadesJogadores } from '@/src/services/api';
+
 
 import {
   BASE_URL,
@@ -98,6 +101,15 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
 
   const carregarDados = useCallback(async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
+    // dentro de carregarDados, antes do try:
+    const anoAtual = String(new Date().getFullYear());
+    const ultimaAtualizacao = await SecureStore.getItemAsync('ultimaAtualizacaoIdades');
+    if (ultimaAtualizacao !== anoAtual) {
+      try {
+        await atualizarIdadesJogadores();
+        await SecureStore.setItemAsync('ultimaAtualizacaoIdades', anoAtual);
+      } catch { /* silencioso — não bloqueia o carregamento */ }
+    }
     try {
       const [t, c, cat, jog, p] = await Promise.all([
         fetchTimes(), fetchCompeticoes(), fetchCategorias(), fetchJogadores(), fetchPartidas()
@@ -177,12 +189,21 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
     }
   };
 
-  // Salva de fato a súmula/elenco no banco antes de ir pra tela de jogos
+  // Salva o elenco no banco e avança para a tabela de jogos
   const avancarParaJogos = async () => {
+    // Valida que pelo menos 1 jogador foi selecionado em cada categoria do tipo do campeonato
+    const categoriasDoTipo = categorias.filter(c => getTipoCategoria(c.nome) === tipoForm);
+    const vazias = categoriasDoTipo.filter(c => !elencoSelecionado[c.id]?.length);
+    if (vazias.length > 0) {
+      return Alert.alert(
+        'Elenco incompleto',
+        `Selecione pelo menos 1 atleta em:\n${vazias.map(c => c.nome).join(', ')}`
+      );
+    }
+
     setSalvando(true);
     try {
       if (itemSelecionado && 'ano' in itemSelecionado) {
-        // Junta os IDs de todas as categorias do campeonato e manda pro banco
         const todosJogadores = (Object.values(elencoSelecionado).flat() as any[])
           .filter((id): id is number => id != null && typeof id === 'number');
         await salvarElencoCompeticao(itemSelecionado.id, todosJogadores);
@@ -212,52 +233,81 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
   };
 
   // ── IMPORTAÇÃO VIA IA ──
-  const importarArquivo = async (tipo: 'documento' | 'imagem') => {
-    if (!itemSelecionado || !('ano' in itemSelecionado)) {
-      return Alert.alert('Atenção', 'Salve o campeonato antes de importar.');
+const importarArquivo = async (tipo: 'documento' | 'imagem') => {
+  if (!itemSelecionado || !('ano' in itemSelecionado)) {
+    return Alert.alert('Atenção', 'Salve o campeonato antes de importar.');
+  }
+ 
+  let uri: string, nome: string, mimeType: string;
+ 
+  if (tipo === 'imagem') {
+    // ── Imagem (foto da tabela) ──────────────────────────────────────────────
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+    if (result.canceled) return;
+    uri      = result.assets[0].uri;
+    nome     = result.assets[0].fileName ?? 'foto.jpg';
+    mimeType = result.assets[0].mimeType ?? 'image/jpeg';
+ 
+  } else {
+    // ── Documento: PDF, CSV, TXT, XLS, XLSX ────────────────────────────────
+    const result = await DocumentPicker.getDocumentAsync({
+      // Lista explícita + '*/*' como fallback para Android/iOS que mapeiam
+      // arquivos xlsx como application/octet-stream
+      type: [
+        'application/pdf',
+        'text/csv',
+        'text/plain',
+        'application/vnd.ms-excel',                                           
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  
+        'application/octet-stream',  
+        '*/*',                       
+      ],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+ 
+    uri      = result.assets[0].uri;
+    nome     = result.assets[0].name;
+    mimeType = result.assets[0].mimeType ?? 'application/octet-stream';
+ 
+    // Corrige o mime quando o sistema retorna genérico mas a extensão é xlsx/xls
+    const ext = nome.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (ext === 'xls')  mimeType = 'application/vnd.ms-excel';
+    if (ext === 'csv')  mimeType = 'text/csv';
+  }
+ 
+  setImportando(true);
+  setResultadoImport(null);
+ 
+  try {
+    const formData = new FormData();
+    formData.append('competicaoId', String((itemSelecionado as Competicao).id));
+    formData.append('arquivo', { uri, name: nome, type: mimeType } as any);
+ 
+    const resposta = await fetch(`${BASE_URL}/partidas/importar`, {
+      method: 'POST',
+      body: formData,
+    });
+ 
+    if (!resposta.ok) {
+      const erro = await resposta.json();
+      throw new Error(erro.error || 'Erro no servidor.');
     }
-    let uri: string, nome: string, mimeType: string;
-
-    if (tipo === 'imagem') {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9,
-      });
-      if (result.canceled) return;
-      uri = result.assets[0].uri;
-      nome = result.assets[0].fileName ?? 'foto.jpg';
-      mimeType = result.assets[0].mimeType ?? 'image/jpeg';
-    } else {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/plain', 'application/pdf'],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled) return;
-      uri = result.assets[0].uri;
-      nome = result.assets[0].name;
-      mimeType = result.assets[0].mimeType ?? 'text/plain';
-    }
-
-    setImportando(true);
-    setResultadoImport(null);
-    try {
-      const formData = new FormData();
-      formData.append('competicaoId', String((itemSelecionado as Competicao).id));
-      formData.append('arquivo', { uri, name: nome, type: mimeType } as any);
-
-      const resposta = await fetch(`${BASE_URL}/partidas/importar`, { method: 'POST', body: formData });
-      if (!resposta.ok) {
-        const erro = await resposta.json();
-        throw new Error(erro.error || 'Erro no servidor.');
-      }
-      const data = await resposta.json();
-      setResultadoImport({ criados: data.criados, pulados: data.pulados });
-      carregarDados(true);
-    } catch (err: any) {
-      Alert.alert('Erro na Importação', err.message);
-    } finally {
-      setImportando(false);
-    }
-  };
+ 
+    const data = await resposta.json();
+    setResultadoImport({ criados: data.criados, pulados: data.pulados });
+    carregarDados(true);
+ 
+  } catch (err: any) {
+    Alert.alert('Erro na Importação', err.message);
+  } finally {
+    setImportando(false);
+  }
+};
 
   // ── FUNÇÕES ADVERSÁRIOS ──
   const abrirFormAdversario = (time?: Time) => {
@@ -583,14 +633,21 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
                 <View style={styles.gridCategorias}>
                   {categorias.filter(c => getTipoCategoria(c.nome) === tipoForm).map(cat => {
                     const totalSelecionados = elencoSelecionado[cat.id]?.length || 0;
+                    const vazio = totalSelecionados === 0;
                     return (
                       <TouchableOpacity key={cat.id} style={styles.cardCategoriaOcian} onPress={() => abrirSelecaoElenco(cat)}>
-                        <View style={[styles.iconCircleOcian, { backgroundColor: totalSelecionados > 0 ? colors.primary + '22' : '#2a2a2a' }]}>
-                          <MaterialCommunityIcons name={totalSelecionados > 0 ? 'check-all' : 'account-group-outline'} size={28} color={totalSelecionados > 0 ? colors.primary : colors.azulClaro} />
+                        <View style={[styles.iconCircleOcian, {
+                          backgroundColor: vazio ? colors.vermelho + '15' : colors.primary + '22',
+                        }]}>
+                          <MaterialCommunityIcons
+                            name={vazio ? 'alert-outline' : 'check-all'}
+                            size={28}
+                            color={vazio ? colors.vermelho : colors.primary}
+                          />
                         </View>
                         <Text style={styles.catOcianNome}>{cat.nome}</Text>
-                        <Text style={[styles.catOcianBadgeTxt, totalSelecionados > 0 && { color: colors.primary }]}>
-                          {totalSelecionados} selecionados
+                        <Text style={[styles.catOcianBadgeTxt, { color: vazio ? colors.vermelho : colors.primary }]}>
+                          {vazio ? 'Obrigatório' : `${totalSelecionados} selecionados`}
                         </Text>
                       </TouchableOpacity>
                     );

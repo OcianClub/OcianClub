@@ -8,6 +8,7 @@ import { colors } from '@/src/theme/colors';
 import { Header } from '@/src/components/Header';
 import OrganizarPartidaCampeonato from '@/src/components/organizarPartidaCampeonato';
 import { fetchPartidasPorCompeticao, fetchJogadoresPorCompeticao, atualizarStatusPartida } from '@/src/services/api';
+import PrepararPartida from '@/src/components/PrepararPartida';
 import { s } from '@/src/styles/detalhesCompeticaoStyles';
 
 interface Competicao { id: number; nome: string; ano: number; tipo: 'INICIACAO' | 'BASE'; }
@@ -114,6 +115,7 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
   const [modalDetalhes,      setModalDetalhes]      = useState(false);
   const [modalStatus,        setModalStatus]        = useState(false);
   const [modalEditar,        setModalEditar]        = useState(false);
+  const [modalPreparar, setModalPreparar] = useState(false);
   const [atualizandoStatus,  setAtualizandoStatus]  = useState(false);
 
   const carregar = useCallback(async (silencioso = false) => {
@@ -416,7 +418,7 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
                       style={s.btnPreparaModal}
                       onPress={() => {
                         setModalDetalhes(false);
-                        Alert.alert('Em breve', 'Tela de preparação em desenvolvimento.');
+                        setModalPreparar(true);
                       }}
                     >
                       <MaterialCommunityIcons name="clipboard-list-outline" size={20} color="#a855f7" />
@@ -469,6 +471,21 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
             partida={partidaSelecionada}
             onFechar={() => setModalEditar(false)}
             onSalvo={() => { setModalEditar(false); carregar(true); }}
+          />
+        )}
+      </Modal>
+
+      {/* ── MODAL PREPARAR PARTIDA ── */}
+      <Modal visible={modalPreparar} transparent={false} animationType="slide">
+        {partidaSelecionada && (
+          <PrepararPartida
+            partida={partidaSelecionada}
+            competicao={competicao}
+            onFechar={() => setModalPreparar(false)}
+            onConfirmado={() => {
+              setModalPreparar(false);
+              carregar(true); // recarrega a lista para mostrar status PREPARADA
+            }}
           />
         )}
       </Modal>
