@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000' ;
-// export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ocianclub-node.onrender.com';
+// export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000' ;
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ocianclub-node.onrender.com';
 
 async function getToken() {
   return await SecureStore.getItemAsync('userToken');
@@ -238,7 +238,8 @@ export async function atualizarPlacarPartida(id: number, gols_mandante: number, 
 
 export async function criarEvento(partida_id: number, dados: {
   tipo: string;
-  minuto: number;
+  minuto?: number | null;
+  periodo?: number | null;
   jogador_id?: number | null;
   doOcian?: boolean;
 }) {
@@ -250,6 +251,24 @@ export async function criarEvento(partida_id: number, dados: {
   if (!res.ok) throw new Error('Erro ao criar evento');
   return res.json();
 }
+
+// src/services/api.ts
+export const fetchEventosDaPartida = async (partidaId: number) => {
+  const response = await fetch(`${BASE_URL}/partidas/${partidaId}/eventos`);
+  if (!response.ok) throw new Error('Falha ao buscar eventos');
+  return await response.json();
+};
+
+export const deletarEvento = async (eventoId: number) => {
+  const response = await fetch(`${BASE_URL}/eventos/${eventoId}`, { 
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) throw new Error('Falha ao deletar evento');
+  return await response.json();
+};
 
 // ── ESCALAÇÃO ──────────────────────────────────────────────────────────────
 

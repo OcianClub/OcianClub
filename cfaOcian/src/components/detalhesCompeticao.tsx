@@ -473,7 +473,7 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
             onSalvo={() => { setModalEditar(false); carregar(true); }}
           />
         )}
-      </Modal>~
+      </Modal>
 
       {/* ── MODAL PREPARAR PARTIDA ── */}
       <Modal visible={modalPreparar} transparent={false} animationType="slide">
