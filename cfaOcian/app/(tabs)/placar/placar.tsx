@@ -1,215 +1,462 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+// app/(tabs)/placar/campeonato.tsx
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Header } from '@/src/components/Header';
 import { colors } from '@/src/theme/colors';
-import { styles } from '../../../src/styles/placarStyles';
-import PagerView from 'react-native-pager-view';
-import { CarrosselSubs, SUBS_INICIACAO, SUBS_BASE } from '@/src/components/CarrosselSubs';
+import {
+  fetchClassificacaoCampeonato,
+  ClassificacaoItem,
+  FiltrosCampeonato,
+} from '@/src/services/api';
 
-interface TimeClassificacao {
-  id: number;
-  posicao: number;
-  clube: string;
-  pontos: number;
-  jogos: number;
-  vitorias: number;
-  empates: number;
-  derrotas: number;
-  saldo_gols: number;
-  serie: 'ouro' | 'prata' | 'bronze' | 'rubi';
-  isOcian: boolean;
+const MARGIN = 16;
+const GERAL  = 'GERAL';
+
+// ── Opções de filtro ──────────────────────────────────────────────────────────
+
+const DIVISOES   = ['a1', 'a2', 'a3'] as const;
+const CATEGORIAS = [
+  'sub7', 'sub8', 'sub9', 'sub10',
+  'sub12', 'sub14', 'sub16', 'sub18',
+] as const;
+
+type Divisao   = typeof DIVISOES[number];
+type Categoria = typeof CATEGORIAS[number];
+
+const LABEL_DIVISAO: Record<Divisao, string> = {
+  a1: 'Divisão A1', a2: 'Divisão A2', a3: 'Divisão A3',
+};
+const LABEL_CATEGORIA: Record<Categoria, string> = {
+  sub7: 'Sub-7', sub8: 'Sub-8', sub9: 'Sub-9', sub10: 'Sub-10',
+  sub12: 'Sub-12', sub14: 'Sub-14', sub16: 'Sub-16', sub18: 'Sub-18',
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatSaldo(s: number): string {
+  return s > 0 ? `+${s}` : String(s);
 }
 
-export default function Placar() {
-  const pagerRef = useRef<PagerView>(null);
-  
-  // ── ESTADOS DE FILTRO ──
-  const [tipoClassificacao, setTipoClassificacao] = useState<'FASE DE GRUPOS' | 'GERAL'>('FASE DE GRUPOS');
-  const [faseAtiva, setFaseAtiva] = useState<'INICIACAO' | 'BASE'>('INICIACAO');
-  const [subIndex, setSubIndex] = useState(0);
-  
-  // ── ESTADOS DE DADOS ──
-  const [loading, setLoading] = useState(false);
-  const [tabela, setTabela] = useState<TimeClassificacao[]>([]);
+function tempoDesde(date: Date): string {
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60)   return 'agora mesmo';
+  if (diff < 3600) return `há ${Math.floor(diff / 60)} min`;
+  return `há ${Math.floor(diff / 3600)}h`;
+}
 
-  // Define qual array de subs estamos usando agora
-  const subsAtuais = faseAtiva === 'INICIACAO' ? SUBS_INICIACAO : SUBS_BASE;
+// ── Skeleton ──────────────────────────────────────────────────────────────────
 
-  // ── SINCRONIZAÇÃO CARROSSEL <-> PAGERVIEW ──
-  const handleSubChange = (index: number) => {
-    setSubIndex(index);
-    pagerRef.current?.setPage(index);
-  };
-
-  const onPageSelected = (e: any) => {
-    const index = e.nativeEvent.position;
-    if (index !== subIndex) setSubIndex(index);
-  };
-
-  const handleTrocarFase = (novaFase: 'INICIACAO' | 'BASE') => {
-    setFaseAtiva(novaFase);
-    handleSubChange(0); // Volta para a primeira tela ao trocar de Iniciação pra Base
-  };
-
-  // ── BUSCA DE DADOS (Mock por enquanto) ──
-  useEffect(() => {
-    const buscarClassificacao = async () => {
-      setLoading(true);
-      try {
-        // Aqui no futuro entrará a chamada da API buscando pelo ID do Sub e Tipo de Classificação
-        setTimeout(() => {
-          setTabela([
-            { id: 1, posicao: 1,  clube: 'OCIAN PRAIA CLUBE', pontos: 12, jogos: 4, vitorias: 4, empates: 0, derrotas: 0, saldo_gols: 18,  serie: 'ouro',   isOcian: true  },
-            { id: 2, posicao: 2,  clube: 'Santos FC',         pontos: 10, jogos: 4, vitorias: 3, empates: 1, derrotas: 0, saldo_gols: 12,  serie: 'ouro',   isOcian: false },
-            { id: 3, posicao: 9,  clube: 'Portuguesa',        pontos: 6,  jogos: 4, vitorias: 2, empates: 0, derrotas: 2, saldo_gols: 2,   serie: 'prata',  isOcian: false },
-            { id: 4, posicao: 17, clube: 'São Caetano',       pontos: 4,  jogos: 4, vitorias: 1, empates: 1, derrotas: 2, saldo_gols: -4,  serie: 'bronze', isOcian: false },
-            { id: 5, posicao: 25, clube: 'Jabaquara AC',      pontos: 0,  jogos: 4, vitorias: 0, empates: 0, derrotas: 4, saldo_gols: -14, serie: 'rubi',   isOcian: false },
-          ]);
-          setLoading(false);
-        }, 500);
-      } catch (error) {
-        setLoading(false);
-      }
-    };
-
-    buscarClassificacao();
-  }, [subIndex, faseAtiva, tipoClassificacao]);
-
-  const getSerieColor = (serie: string) => {
-    switch (serie) {
-      case 'ouro':   return colors.amarelo;
-      case 'prata':  return colors.cinza_claro;
-      case 'bronze': return '#CD7F32';
-      case 'rubi':   return colors.vermelho;
-      default:       return 'transparent';
-    }
-  };
-
+function SkeletonRow() {
   return (
-    <View style={styles.container}>
-      <Header title="PLACAR" icon="trophy-outline" showLogo={false} showProfile={true} btnNotificacao='bell'/>
-
-      {/* ── CARROSSEL DE SUBS ── */}
-      <CarrosselSubs 
-        tipoFiltro={faseAtiva}
-        onTrocarTipo={handleTrocarFase}
-        indexAtual={subIndex} 
-        onChangeIndex={handleSubChange} 
-      />
-
-      {/* ── TOGGLE FASE DE GRUPOS / GERAL ── */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleBtn, tipoClassificacao === 'FASE DE GRUPOS' && styles.toggleBtnActive]}
-          onPress={() => setTipoClassificacao('FASE DE GRUPOS')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.toggleText, tipoClassificacao === 'FASE DE GRUPOS' && styles.toggleTextActive]}>
-            FASE DE GRUPOS
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toggleBtn, tipoClassificacao === 'GERAL' && styles.toggleBtnActive]}
-          onPress={() => setTipoClassificacao('GERAL')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.toggleText, tipoClassificacao === 'GERAL' && styles.toggleTextActive]}>
-            GERAL
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── TELAS DESLIZÁVEIS (PAGERVIEW) ── */}
-      <PagerView
-        ref={pagerRef}
-        style={styles.pagerView}
-        initialPage={0}
-        onPageSelected={onPageSelected}
-      >
-        {subsAtuais.map((sub, pageIndex) => (
-          <View key={`${faseAtiva}-${sub.id}`}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-
-              <View style={styles.tableContainer}>
-                <View style={styles.tableHeader}>
-                  <Text style={[styles.thText, styles.colPos]}>POS</Text>
-                  <Text style={[styles.thText, styles.colClube]}>CLUBE</Text>
-                  <Text style={[styles.thText, styles.colStat]}>P</Text>
-                  <Text style={[styles.thText, styles.colStat]}>J</Text>
-                  <Text style={[styles.thText, styles.colStat]}>V</Text>
-                  <Text style={[styles.thText, styles.colStat]}>E</Text>
-                  <Text style={[styles.thText, styles.colStat]}>D</Text>
-                  <Text style={[styles.thText, styles.colStat]}>SG</Text>
-                </View>
-
-                {loading ? (
-                  <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 40 }} />
-                ) : (
-                  tabela.map((time, index) => (
-                    <View
-                      key={time.id}
-                      style={[
-                        styles.tableRow,
-                        index !== tabela.length - 1 && styles.rowBorder,
-                        time.isOcian && styles.tableRowOcian,
-                      ]}
-                    >
-                      <View style={[styles.serieBar, { backgroundColor: getSerieColor(time.serie) }]} />
-
-                      <Text style={[styles.colPosText, styles.colPos]}>{time.posicao}</Text>
-
-                      <View style={styles.clubeContainer}>
-                        <View style={styles.clubeIcone}>
-                          <Text style={styles.clubeIniciais}>
-                            {time.clube.split(' ').map(p => p[0]).join('').slice(0, 3)}
-                          </Text>
-                        </View>
-                        <Text
-                          style={[styles.tdText, styles.clubeText, time.isOcian && styles.ocianTextBold]}
-                          numberOfLines={1}
-                        >
-                          {time.clube}
-                        </Text>
-                      </View>
-
-                      <Text style={[styles.tdText, styles.colStat, styles.colStatDestaque, time.isOcian && styles.ocianHighlightColor]}>
-                        {time.pontos}
-                      </Text>
-                      <Text style={[styles.tdText, styles.colStat]}>{time.jogos}</Text>
-                      <Text style={[styles.tdText, styles.colStat]}>{time.vitorias}</Text>
-                      <Text style={[styles.tdText, styles.colStat]}>{time.empates}</Text>
-                      <Text style={[styles.tdText, styles.colStat]}>{time.derrotas}</Text>
-                      <Text style={[styles.tdText, styles.colStat, styles.colStatDestaque, time.isOcian && styles.ocianHighlightColor]}>
-                        {time.saldo_gols > 0 ? `+${time.saldo_gols}` : time.saldo_gols}
-                      </Text>
-                    </View>
-                  ))
-                )}
-              </View>
-
-              <View style={styles.legendContainer}>
-                <Text style={styles.legendTitle}>Legenda</Text>
-                <View style={styles.legendGrid}>
-                  {[
-                    { cor: colors.amarelo,     label: 'SÉRIE OURO'   },
-                    { cor: colors.cinza_claro, label: 'SÉRIE PRATA'  },
-                    { cor: '#CD7F32',          label: 'SÉRIE BRONZE' },
-                    { cor: colors.vermelho,    label: 'SÉRIE RUBI'   },
-                  ].map(({ cor, label }) => (
-                    <View key={label} style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: cor }]} />
-                      <Text style={styles.legendText}>{label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              <View style={{ height: 100 }} />
-            </ScrollView>
-          </View>
-        ))}
-      </PagerView>
+    <View style={[s.tableRow, s.rowBorder]}>
+      <View style={[s.skeleton, { width: 24, marginRight: 10 }]} />
+      <View style={[s.skeleton, { flex: 1, marginRight: 8 }]} />
+      <View style={[s.skeleton, { width: 22 }]} />
+      <View style={[s.skeleton, { width: 22, marginHorizontal: 4 }]} />
+      <View style={[s.skeleton, { width: 22 }]} />
+      <View style={[s.skeleton, { width: 28, marginLeft: 4 }]} />
     </View>
   );
 }
+
+// ── Banner ────────────────────────────────────────────────────────────────────
+
+function CampeonatoBanner({ divisao, categoria }: { divisao: Divisao; categoria: Categoria }) {
+  return (
+    <View style={s.banner}>
+      <View style={s.bannerIconWrap}>
+        <Ionicons name="trophy" size={20} color={colors.azulClaro} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.bannerCampeonato}>PAULISTA 2026</Text>
+        <Text style={s.bannerSub}>
+          {LABEL_DIVISAO[divisao]} · {LABEL_CATEGORIA[categoria]}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Card do Ocian ─────────────────────────────────────────────────────────────
+
+function OcianCard({ time }: { time: ClassificacaoItem }) {
+  const stats = [
+    { label: 'PTS', value: String(time.pontos) },
+    { label: 'J',   value: String(time.jogos) },
+    { label: 'GP',  value: String(time.golsPro) },
+    { label: 'GC',  value: String(time.golsContra) },
+    { label: 'SG',  value: formatSaldo(time.saldo) },
+  ];
+  return (
+    <View style={s.ocianCard}>
+      <View style={s.ocianHeader}>
+        <View style={s.ocianIcone}>
+          <Text style={s.ocianIniciais}>OPC</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.ocianNome}>{time.clube}</Text>
+          <Text style={s.ocianPos}>{time.posicao}º Lugar · {time.grupo}</Text>
+        </View>
+        <View style={s.ocianBadge}>
+          <Text style={s.ocianBadgeText}>DESTAQUE</Text>
+        </View>
+      </View>
+      <View style={s.ocianStats}>
+        {stats.map(({ label, value }) => (
+          <View key={label} style={s.ocianStatItem}>
+            <Text style={s.ocianStatValue}>{value}</Text>
+            <Text style={s.ocianStatLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ── Linha da tabela ───────────────────────────────────────────────────────────
+
+function ClassificacaoRow({ time, isLast }: { time: ClassificacaoItem; isLast: boolean }) {
+  const iniciais = time.clube.split(' ').filter(Boolean).map(p => p[0]).join('').slice(0, 3);
+  return (
+    <View style={[s.tableRow, !isLast && s.rowBorder, time.destaque && s.tableRowOcian]}>
+      {time.destaque && <View style={s.ocianBorda} />}
+      <Text style={[s.colPosText, time.destaque && s.ocianColor]}>{time.posicao}</Text>
+      <View style={s.clubeContainer}>
+        <View style={[s.clubeIcone, time.destaque && s.clubeIconeOcian]}>
+          <Text style={[s.clubeIniciais, time.destaque && s.clubeIniciaisOcian]}>{iniciais}</Text>
+        </View>
+        <Text style={[s.tdText, s.clubeText, time.destaque && s.ocianTextBold]} numberOfLines={1}>
+          {time.clube}
+        </Text>
+      </View>
+      <Text style={[s.tdText, s.colStat, s.colDestaque, time.destaque && s.ocianColor]}>
+        {time.pontos}
+      </Text>
+      <Text style={[s.tdText, s.colStat]}>{time.jogos}</Text>
+      <Text style={[s.tdText, s.colStat]}>{time.vitorias}</Text>
+      <Text style={[s.tdText, s.colStat, s.colDestaque, time.destaque && s.ocianColor]}>
+        {formatSaldo(time.saldo)}
+      </Text>
+    </View>
+  );
+}
+
+// ── Chip simples ──────────────────────────────────────────────────────────────
+
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[s.chip, active && s.chipActive]} onPress={onPress} activeOpacity={0.75}>
+      <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Tabela com header ─────────────────────────────────────────────────────────
+
+function Tabela({ times }: { times: ClassificacaoItem[] }) {
+  return (
+    <View style={s.tableContainer}>
+      <View style={s.tableHeader}>
+        <Text style={[s.thText, s.colPosHeader]}>POS</Text>
+        <Text style={[s.thText, { flex: 1 }]}>CLUBE</Text>
+        <Text style={[s.thText, s.colStatHeader]}>P</Text>
+        <Text style={[s.thText, s.colStatHeader]}>J</Text>
+        <Text style={[s.thText, s.colStatHeader]}>V</Text>
+        <Text style={[s.thText, s.colStatHeader]}>SG</Text>
+      </View>
+      {times.map((time, idx) => (
+        <ClassificacaoRow
+          key={`${time.grupo}-${time.posicao}-${idx}`}
+          time={time}
+          isLast={idx === times.length - 1}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ── Tela principal ────────────────────────────────────────────────────────────
+
+export default function Campeonato() {
+  const [divisao,      setDivisao]      = useState<Divisao>('a3');
+  const [categoria,    setCategoria]    = useState<Categoria>('sub12');
+  const [abaAtiva,     setAbaAtiva]     = useState<string>(GERAL);
+  const [loading,      setLoading]      = useState(true);
+  const [refreshing,   setRefreshing]   = useState(false);
+  const [tabela,       setTabela]       = useState<ClassificacaoItem[]>([]);
+  const [grupos,       setGrupos]       = useState<string[]>([]);
+  const [erro,         setErro]         = useState<string | null>(null);
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
+
+  const carregar = useCallback(async (viaPull = false) => {
+    if (viaPull) setRefreshing(true);
+    else         setLoading(true);
+    setErro(null);
+
+    try {
+      const filtros: FiltrosCampeonato = {
+        temporada: '2026',
+        titulo:    'paulista',
+        divisao,
+        categoria,
+      };
+      const dados = await fetchClassificacaoCampeonato(filtros);
+      setTabela(dados);
+
+      // Grupos únicos na ordem em que aparecem na API
+      const gruposUnicos = [...new Set(dados.map(t => t.grupo))].filter(Boolean);
+      setGrupos(gruposUnicos);
+
+      setAtualizadoEm(new Date());
+
+      // Auto-selecionar o grupo do Ocian; fallback: Geral
+      const grupoOcian = dados.find(t => t.destaque)?.grupo ?? null;
+      setAbaAtiva(grupoOcian ?? GERAL);
+    } catch {
+      setErro('Não foi possível carregar a classificação. Verifique sua conexão.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [divisao, categoria]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  // Times visíveis na aba atual
+  const timesVisiveis: ClassificacaoItem[] =
+    abaAtiva === GERAL
+      ? [...tabela].sort((a, b) => a.posicao - b.posicao) // Geral = todos ordenados por posição
+      : tabela.filter(t => t.grupo === abaAtiva);          // Chave = só aquele grupo
+
+  // Ocian na aba atual
+  const ocian = timesVisiveis.find(t => t.destaque) ?? null;
+
+  return (
+    <View style={s.container}>
+      <Header
+        title="CAMPEONATO"
+        icon="trophy-outline"
+        showLogo={false}
+        showProfile={true}
+        btnNotificacao="bell"
+      />
+
+      <CampeonatoBanner divisao={divisao} categoria={categoria} />
+
+      {/* Filtro Divisão */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.chipRow} style={s.chipScroll}>
+        {DIVISOES.map(d => (
+          <Chip key={d} label={LABEL_DIVISAO[d]} active={divisao === d} onPress={() => setDivisao(d)} />
+        ))}
+      </ScrollView>
+
+      {/* Filtro Categoria */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.chipRow} style={s.chipScroll}>
+        {CATEGORIAS.map(c => (
+          <Chip key={c} label={LABEL_CATEGORIA[c]} active={categoria === c} onPress={() => setCategoria(c)} />
+        ))}
+      </ScrollView>
+
+      {/* Abas de chave: só aparecem depois de carregar, e só se tiver grupos */}
+      {!loading && grupos.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.abasRow} style={s.abasScroll}>
+          {grupos.map(g => (
+            <TouchableOpacity
+              key={g}
+              style={[s.aba, abaAtiva === g && s.abaAtiva]}
+              onPress={() => setAbaAtiva(g)}
+              activeOpacity={0.75}
+            >
+              {/* Exibe o nome do grupo exatamente como vem da API */}
+              <Text style={[s.abaText, abaAtiva === g && s.abaTextAtiva]}>{g}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={[s.aba, abaAtiva === GERAL && s.abaAtiva]}
+            onPress={() => setAbaAtiva(GERAL)}
+            activeOpacity={0.75}
+          >
+            <Text style={[s.abaText, abaAtiva === GERAL && s.abaTextAtiva]}>Geral</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* Conteúdo */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => carregar(true)} tintColor={colors.primary} />
+        }
+      >
+        {atualizadoEm && (
+          <Text style={s.atualizadoText}>Atualizado {tempoDesde(atualizadoEm)}</Text>
+        )}
+
+        {loading ? (
+          <>
+            <View style={[s.ocianCard, { opacity: 0.4 }]}>
+              <View style={[s.skeleton, { width: 200, height: 18, marginBottom: 10 }]} />
+              <View style={[s.skeleton, { width: 120, height: 13, marginBottom: 18 }]} />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {[0,1,2,3,4].map(i => (
+                  <View key={i} style={[s.skeleton, { flex: 1, height: 44, borderRadius: 10 }]} />
+                ))}
+              </View>
+            </View>
+            <View style={s.tableContainer}>
+              {[0,1,2,3,4].map(i => <SkeletonRow key={i} />)}
+            </View>
+          </>
+        ) : erro ? (
+          <View style={s.emptyState}>
+            <Ionicons name="warning-outline" size={48} color={colors.text_secondary} style={{ marginBottom: 16 }} />
+            <Text style={s.emptyTitle}>Ops!</Text>
+            <Text style={s.emptyText}>{erro}</Text>
+          </View>
+        ) : tabela.length === 0 ? (
+          <View style={s.emptyState}>
+            <Ionicons name="trophy-outline" size={48} color={colors.text_secondary} style={{ marginBottom: 16 }} />
+            <Text style={s.emptyTitle}>Classificação não disponível</Text>
+            <Text style={s.emptyText}>Puxe para baixo para atualizar ou tente outra categoria.</Text>
+          </View>
+        ) : (
+          <>
+            {ocian && <OcianCard time={ocian} />}
+            <View style={s.grupoSection}>
+              <Tabela times={timesVisiveis} />
+            </View>
+          </>
+        )}
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  content:   { paddingTop: 8, paddingBottom: 40 },
+
+  atualizadoText: {
+    fontFamily: 'Creato-Regular', color: colors.text_secondary,
+    fontSize: 11, textAlign: 'center', marginBottom: 12, letterSpacing: 0.5,
+  },
+
+  // Banner
+  banner: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: MARGIN, marginTop: 12, marginBottom: 12,
+    backgroundColor: '#141414', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#2a2a2a', gap: 12,
+  },
+  bannerIconWrap: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#0e78ff18', justifyContent: 'center', alignItems: 'center',
+  },
+  bannerCampeonato: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 15, letterSpacing: 1 },
+  bannerSub: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 11, marginTop: 2, letterSpacing: 0.4 },
+
+  // Chips
+  chipScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
+  chipRow: { paddingHorizontal: MARGIN, paddingVertical: 4, gap: 8, flexDirection: 'row', alignItems: 'center' },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#2a2a2a',
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 12, letterSpacing: 0.4 },
+  chipTextActive: { color: '#fff' },
+
+  // Abas de chave
+  abasScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 12 },
+  abasRow: { paddingHorizontal: MARGIN, gap: 6, flexDirection: 'row', alignItems: 'center' },
+  aba: {
+    paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10,
+    backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#2a2a2a',
+  },
+  abaAtiva: { backgroundColor: colors.primary, borderColor: colors.primary },
+  abaText: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 12, letterSpacing: 0.4 },
+  abaTextAtiva: { color: '#fff' },
+
+  // Card Ocian
+  ocianCard: {
+    marginHorizontal: MARGIN, backgroundColor: '#0e78ff0f', borderRadius: 16,
+    borderWidth: 1, borderColor: '#0e78ff44', padding: 18, marginBottom: 20, marginTop: 4,
+  },
+  ocianHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  ocianIcone: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#0e78ff33', justifyContent: 'center', alignItems: 'center',
+  },
+  ocianIniciais: { fontFamily: 'Creato-Bold', color: colors.azulClaro, fontSize: 11, letterSpacing: 0.5 },
+  ocianNome: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 15 },
+  ocianPos:  { fontFamily: 'Creato-Regular', color: colors.azulClaro, fontSize: 12, marginTop: 2 },
+  ocianBadge: {
+    backgroundColor: '#0e78ff22', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: '#0e78ff44',
+  },
+  ocianBadgeText: { fontFamily: 'Creato-Bold', color: colors.azulClaro, fontSize: 9, letterSpacing: 1.2 },
+  ocianStats: { flexDirection: 'row', gap: 6 },
+  ocianStatItem: { flex: 1, backgroundColor: '#0e78ff18', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  ocianStatValue: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 15 },
+  ocianStatLabel: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 9, letterSpacing: 1, marginTop: 2 },
+
+  // Grupo
+  grupoSection: { marginBottom: 24 },
+
+  // Tabela
+  tableContainer: {
+    marginHorizontal: MARGIN, backgroundColor: '#1A1A1A', borderRadius: 16,
+    overflow: 'hidden', borderWidth: 1, borderColor: '#2a2a2a',
+  },
+  tableHeader: {
+    flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 14,
+    backgroundColor: '#111111', alignItems: 'center',
+  },
+  thText: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
+  colPosHeader:  { width: 36, paddingLeft: 4 },
+  colStatHeader: { width: 28, textAlign: 'center' },
+  tableRow: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 14, alignItems: 'center' },
+  tableRowOcian: { backgroundColor: '#0e78ff10' },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#252525' },
+  ocianBorda: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors.primary ?? '#0e78ff', borderRadius: 2 },
+
+  // Células
+  tdText:      { fontFamily: 'Creato-Regular', color: colors.text, fontSize: 13 },
+  colPosText:  { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 13, width: 36, paddingLeft: 4 },
+  colStat:     { width: 28, textAlign: 'center' },
+  colDestaque: { fontFamily: 'Creato-Bold', fontSize: 13 },
+  ocianColor:  { color: colors.azulClaro },
+
+  // Clube
+  clubeContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  clubeIcone: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' },
+  clubeIconeOcian: { backgroundColor: '#0e78ff22' },
+  clubeIniciais: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 9 },
+  clubeIniciaisOcian: { color: colors.azulClaro },
+  clubeText: { fontFamily: 'Creato-Regular', color: colors.text, fontSize: 13, flexShrink: 1 },
+  ocianTextBold: { fontFamily: 'Creato-Bold', color: colors.text },
+
+  // Empty
+  emptyState: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
+  emptyTitle: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 16, marginBottom: 8, textAlign: 'center' },
+  emptyText: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, textAlign: 'center', lineHeight: 20 },
+
+  // Skeleton
+  skeleton: { height: 14, borderRadius: 6, backgroundColor: '#2a2a2a' },
+});

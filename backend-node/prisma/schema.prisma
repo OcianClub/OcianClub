@@ -1,6 +1,3 @@
-// schema.prisma — CFA Ocian
-// Após configurar o .env, rode: npx prisma db push
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,14 +8,146 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ── USUÁRIOS ──────────────────────────────────────────────
 model Usuario {
-  id        Int      @id @default(autoincrement())
-  nome      String
-  email     String   @unique
-  senha     String
-  criadoEm  DateTime @default(now())
-  role      Role     @default(USER)
+  id       Int      @id @default(autoincrement())
+  nome     String
+  email    String   @unique
+  senha    String
+  criadoEm DateTime @default(now())
+  role     Role     @default(USER)
+}
+
+model Categoria {
+  id          Int           @id @default(autoincrement())
+  nome        String        @unique
+  faixaIdade  Int           @default(0)
+  tipo        TipoCategoria
+  jogadores   Jogador[]
+  partidas    Partida[]
+  times       Time[]        @relation("TimeCategorias")
+  competicoes Competicao[]  @relation("CompeticaoCategorias")
+}
+
+model Time {
+  id                 Int              @id @default(autoincrement())
+  nome               String
+  escudo             String?
+  categoria_id       Int?
+  competicoes        CompeticaoTime[]
+  partidas_mandante  Partida[]        @relation("Mandante")
+  partidas_visitante Partida[]        @relation("Visitante")
+  categoria          Categoria?       @relation("TimeCategorias", fields: [categoria_id], references: [id])
+
+  @@unique([nome, categoria_id])
+  @@index([categoria_id])
+}
+
+model Competicao {
+  id                  Int                 @id @default(autoincrement())
+  nome                String
+  ano                 Int
+  tipo                TipoCompeticao
+  jogadores_inscritos CompeticaoJogador[]
+  times_inscritos     CompeticaoTime[]
+  partidas            Partida[]
+  categorias          Categoria[]         @relation("CompeticaoCategorias")
+}
+
+model Jogador {
+  id           Int                 @id @default(autoincrement())
+  nome         String
+  cpf          String              @unique
+  dtNasc       DateTime            @db.Date
+  numCamisa    Int?
+  posicao      String
+  ativo        Boolean             @default(true)
+  perfil_ml    String?
+  scores_ml    Json?
+  nota_geral   Float?
+  categoria_id Int
+  competicoes  CompeticaoJogador[]
+  escalacoes   EscalacaoPartida[]
+  eventos      Evento[]
+  categoria    Categoria           @relation(fields: [categoria_id], references: [id])
+
+  @@index([categoria_id])
+}
+
+model Partida {
+  id                    Int                @id @default(autoincrement())
+  mandante_id           Int
+  visitante_id          Int
+  gols_mandante         Int                @default(0)
+  gols_visitante        Int                @default(0)
+  horario               String?
+  data                  DateTime           @db.Date
+  local                 String?
+  rodada                Int?
+  grupo                 String?
+  emCasa                Boolean            @default(true)
+  status                StatusPartida      @default(AGENDADA)
+  categoria_id          Int
+  competicao_id         Int?
+  jogadores_escalonados EscalacaoPartida[]
+  eventos               Evento[]
+  categoria             Categoria          @relation(fields: [categoria_id], references: [id])
+  competicao            Competicao?        @relation(fields: [competicao_id], references: [id])
+  mandante              Time               @relation("Mandante", fields: [mandante_id], references: [id])
+  visitante             Time               @relation("Visitante", fields: [visitante_id], references: [id])
+
+  @@unique([competicao_id, categoria_id, rodada])
+  @@index([data])
+  @@index([categoria_id])
+  @@index([competicao_id])
+}
+
+model Evento {
+  id         Int        @id @default(autoincrement())
+  partida_id Int
+  tipo       TipoEvento
+  periodo    Int
+  minuto     Int?
+  doOcian    Boolean    @default(true)
+  jogador_id Int?
+  jogador    Jogador?   @relation(fields: [jogador_id], references: [id])
+  partida    Partida    @relation(fields: [partida_id], references: [id], onDelete: Cascade)
+
+  @@index([partida_id])
+}
+
+model CompeticaoTime {
+  id            Int        @id @default(autoincrement())
+  competicao_id Int
+  time_id       Int
+  competicao    Competicao @relation(fields: [competicao_id], references: [id], onDelete: Cascade)
+  time          Time       @relation(fields: [time_id], references: [id], onDelete: Cascade)
+
+  @@unique([competicao_id, time_id])
+}
+
+model CompeticaoJogador {
+  id            Int        @id @default(autoincrement())
+  competicao_id Int
+  jogador_id    Int
+  inscritoEm    DateTime   @default(now())
+  competicao    Competicao @relation(fields: [competicao_id], references: [id], onDelete: Cascade)
+  jogador       Jogador    @relation(fields: [jogador_id], references: [id], onDelete: Cascade)
+
+  @@unique([competicao_id, jogador_id])
+  @@index([competicao_id])
+}
+
+model EscalacaoPartida {
+  id         Int     @id @default(autoincrement())
+  partida_id Int
+  jogador_id Int
+  numCamisa  Int
+  titular    Boolean @default(false)
+  jogador    Jogador @relation(fields: [jogador_id], references: [id], onDelete: Cascade)
+  partida    Partida @relation(fields: [partida_id], references: [id], onDelete: Cascade)
+
+  @@unique([partida_id, jogador_id])
+  @@unique([partida_id, numCamisa])
 }
 
 enum Role {
@@ -26,128 +155,14 @@ enum Role {
   USER
 }
 
-// ── CATEGORIAS ────────────────────────────────────────────
-model Categoria {
-  id          Int           @id @default(autoincrement())
-  nome        String        @unique // "sub-12", "sub-14", etc.
-  faixaIdade  Int           @default(0)// Número do sub (12, 14...) — usado para validar inscrições
-  tipo        TipoCategoria
-
-  jogadores   Jogador[]
-  times       Time[]        @relation("TimeCategorias")
-  partidas    Partida[]
-  competicoes Competicao[]  @relation("CompeticaoCategorias")
-}
-
 enum TipoCategoria {
   INICIACAO
   BASE
 }
 
-// ── TIMES (Adversários + Ocian) ───────────────────────────
-// O Ocian é um único registro no banco.
-// Adversários são únicos por nome + categoria:
-//   "Santos" no sub-12 e "Santos" no sub-14 → registros SEPARADOS.
-model Time {
-  id         Int       @id @default(autoincrement())
-  nome       String
-  escudo     String?
-
-  categoria_id Int?
-  categoria    Categoria? @relation("TimeCategorias", fields: [categoria_id], references: [id])
-
-  competicoes        CompeticaoTime[]
-  partidas_mandante  Partida[]        @relation("Mandante")
-  partidas_visitante Partida[]        @relation("Visitante")
-
-  // Impede duplicidade: mesmo adversário na mesma categoria não pode ser criado duas vezes.
-  // O Ocian fica com categoria_id NULL, escapando da constraint.
-  @@unique([nome, categoria_id])
-  @@index([categoria_id])
-}
-
-// ── COMPETIÇÕES ───────────────────────────────────────────
-model Competicao {
-  id         Int            @id @default(autoincrement())
-  nome       String
-  ano        Int
-  tipo       TipoCompeticao // Define quais Subs podem ser vinculados
-
-  // Quais Subs participam deste campeonato (ex: Base → sub-12, sub-14, sub-16, sub-18)
-  categorias          Categoria[]         @relation("CompeticaoCategorias")
-
-  // Tabela de classificação: todos os times inscritos no campeonato
-  times_inscritos     CompeticaoTime[]
-
-  // Elenco inscrito por jogador (filtro de súmula)
-  jogadores_inscritos CompeticaoJogador[]
-
-  partidas            Partida[]
-}
-
 enum TipoCompeticao {
-  INICIACAO // Sub-7 ao Sub-10
-  BASE      // Sub-12 ao Sub-18
-}
-
-// ── JOGADORES (Elenco do Ocian) ───────────────────────────
-model Jogador {
-  id           Int       @id @default(autoincrement())
-  nome         String
-  cpf          String    @unique
-  dtNasc       DateTime  @db.Date
-  numCamisa    Int?
-  posicao      String
-
-  perfil_ml    String?
-  scores_ml    Json?
-  nota_geral   Float?
-
-  categoria_id Int
-  categoria    Categoria @relation(fields: [categoria_id], references: [id])
-
-  competicoes  CompeticaoJogador[]
-  escalacoes   EscalacaoPartida[]
-  eventos      Evento[]
-
-  @@index([categoria_id])
-}
-
-// ── PARTIDAS ──────────────────────────────────────────────
-model Partida {
-  id             Int           @id @default(autoincrement())
-
-  mandante_id    Int
-  mandante       Time          @relation("Mandante",  fields: [mandante_id],  references: [id])
-
-  visitante_id   Int
-  visitante      Time          @relation("Visitante", fields: [visitante_id], references: [id])
-
-  // Nomenclaturas originais mantidas — o frontend usa esses nomes.m,lk,l
-  // Use emCasa para saber qual lado é o Ocian.
-  gols_mandante  Int           @default(0)
-  gols_visitante Int           @default(0)
-
-  horario         String?       // "19:30"
-  data            DateTime      @db.Date
-  local           String?
-  rodada          Int?
-  grupo           String?
-  emCasa          Boolean       @default(true) // true = Ocian é o mandante
-  status          StatusPartida @default(AGENDADA)       
-
-  categoria_id   Int
-  categoria      Categoria     @relation(fields: [categoria_id], references: [id])
-
-  competicao_id  Int?
-  competicao     Competicao?   @relation(fields: [competicao_id], references: [id])
-
-  jogadores_escalonados EscalacaoPartida[]
-  eventos               Evento[]
-  @@unique([competicao_id, categoria_id, rodada])
-  @@index([data])
-  @@index([categoria_id])
-  @@index([competicao_id])
+  INICIACAO
+  BASE
 }
 
 enum StatusPartida {
@@ -158,85 +173,12 @@ enum StatusPartida {
   CANCELADA
 }
 
-// ── EVENTOS (Scout / IA) ──────────────────────────────────
-model Evento {
-  id         Int        @id @default(autoincrement())
-
-  partida_id Int
-  partida    Partida    @relation(fields: [partida_id], references: [id], onDelete: Cascade)
-
-  tipo       TipoEvento
-  minuto     Int
-
-  // doOcian = false → evento do adversário (gol sofrido, cartão do oponente)
-  // Substitui time_id, que gerava ambiguidade ao depender de um registro solto de Time
-  doOcian    Boolean    @default(true)
-
-  jogador_id Int?       // null para eventos do adversário
-  jogador    Jogador?   @relation(fields: [jogador_id], references: [id])
-
-  @@index([partida_id])
-}
-
 enum TipoEvento {
   GOL
   ASSISTENCIA
   DEFESA
   CARTAO_AMARELO
   CARTAO_VERMELHO
+  CARTAO_AZUL
   FALTA
-}
-
-// ═══════════════════════════════════════════════════════════
-// TABELAS DE JUNÇÃO
-// ═══════════════════════════════════════════════════════════
-
-// Tabela de Classificação: inscreve o Time no Campeonato.
-// Permite buscar todos os times de uma competição para montar
-// pontuação, saldo de gols e posição na tabela.
-model CompeticaoTime {
-  id            Int        @id @default(autoincrement())
-  competicao_id Int
-  competicao    Competicao @relation(fields: [competicao_id], references: [id], onDelete: Cascade)
-  time_id       Int
-  time          Time       @relation(fields: [time_id], references: [id], onDelete: Cascade)
-
-  @@unique([competicao_id, time_id])
-}
-
-// Filtro de Súmula: inscreve o Jogador no Campeonato.
-// Separa "estar no clube" de "estar apto a jogar o torneio".
-// O backend deve rejeitar qualquer escalação de jogador sem
-// registro aqui para a competicao_id daquela Partida.
-model CompeticaoJogador {
-  id            Int        @id @default(autoincrement())
-  competicao_id Int
-  competicao    Competicao @relation(fields: [competicao_id], references: [id], onDelete: Cascade)
-  jogador_id    Int
-  jogador       Jogador    @relation(fields: [jogador_id], references: [id], onDelete: Cascade)
-  inscritoEm   DateTime   @default(now())
-
-  @@unique([competicao_id, jogador_id])
-  @@index([competicao_id])
-}
-
-// A Súmula digital de cada partida.
-// Regras aplicadas no backend (não há CHECK no Postgres para contagem de linhas):
-//   - Máximo 14 jogadores por partida
-//   - Exatamente 5 com titular = true
-//   - Jogador deve ter CompeticaoJogador para a competição da partida
-model EscalacaoPartida {
-  id         Int     @id @default(autoincrement())
-
-  partida_id Int
-  partida    Partida @relation(fields: [partida_id], references: [id], onDelete: Cascade)
-
-  jogador_id Int
-  jogador    Jogador @relation(fields: [jogador_id], references: [id], onDelete: Cascade)
-
-  numCamisa  Int     // Camisa neste jogo (pode diferir do numCamisa padrão do jogador)
-  titular    Boolean @default(false) // Exatamente 5 por partida — validar no service
-
-  @@unique([partida_id, jogador_id])
-  @@unique([partida_id, numCamisa]) // Trava de camisa duplicada na mesma súmula
 }
