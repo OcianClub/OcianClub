@@ -461,11 +461,12 @@ app.get('/partidas', async (req, res) => {
     if (status)        where.status        = status;
     if (competicao_id) where.competicao_id = Number(competicao_id);
     if (mes) {
-      const ano = new Date().getFullYear();
-      where.data = {
-        gte: new Date(`${ano}-${String(mes).padStart(2, '0')}-01T00:00:00Z`),
-        lt:  new Date(`${ano}-${String(Number(mes) + 1).padStart(2, '0')}-01T00:00:00Z`),
-      };
+      const ano    = new Date().getFullYear();
+      const mesNum = Number(mes);
+      // Date.UTC lida com mes=12 corretamente (vira janeiro do ano seguinte)
+      const dataInicio = new Date(Date.UTC(ano, mesNum - 1, 1));
+      const dataFim    = new Date(Date.UTC(ano, mesNum, 1));
+      where.data = { gte: dataInicio, lt: dataFim };
     }
     const partidas = await prisma.partida.findMany({
       where,
@@ -536,24 +537,38 @@ app.get('/jogadores/:id/estatisticas', async (req, res) => {
 
 app.post('/partidas/:id/eventos', async (req, res) => {
   const partidaId = parseInt(req.params.id);
-  const { jogador_id, doOcian, tipo, minuto } = req.body;
+  const { jogador_id, doOcian, tipo, minuto, periodo } = req.body;
   try {
+    // data as any contorna divergência de tipo do Prisma para campos opcionais (Int?)
     const evento = await prisma.evento.create({
       data: {
         partida_id: partidaId,
         jogador_id: jogador_id ? Number(jogador_id) : null,
-        doOcian: doOcian !== undefined ? doOcian : true,
-        tipo, minuto: Number(minuto)
-      },
-      include: { jogador: true }
+        doOcian:    doOcian !== undefined ? Boolean(doOcian) : true,
+        tipo,
+        minuto:  minuto  != null ? Number(minuto)  : null,
+        periodo: periodo != null ? Number(periodo)  : 1,
+      } as any,
     });
+
+    // Busca nome do jogador separadamente (evita conflito de tipo com include)
+    let nomeJogador = 'Adversário';
+    if (evento.jogador_id) {
+      const jog = await prisma.jogador.findUnique({
+        where: { id: evento.jogador_id },
+        select: { nome: true },
+      });
+      nomeJogador = jog?.nome ?? 'Adversário';
+    }
+
     io.emit('evento_partida', {
-      tipo: evento.tipo,
-      jogador: evento.jogador?.nome || 'Adversário',
-      minuto: evento.minuto,
-      partida_id: partidaId
+      tipo:       evento.tipo,
+      jogador:    nomeJogador,
+      minuto:     evento.minuto,
+      partida_id: partidaId,
     });
-    res.status(201).json(evento);
+
+    res.status(201).json({ ...evento, jogador: nomeJogador ? { nome: nomeJogador } : null });
   } catch (error: any) { res.status(500).json({ error: 'Erro ao salvar evento' }); }
 });
 
@@ -688,6 +703,16 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
   } catch (error: any) {
     console.error('Erro ao salvar escalação:', error.message);
     res.status(500).json({ error: error.message || 'Erro ao salvar escalação' });
+  }
+});
+
+// POST /admin/reprocessar-scout — força reprocessamento do Scout IA manualmente
+app.post('/admin/reprocessar-scout', async (req, res) => {
+  try {
+    await processarMachineLearning();
+    res.json({ ok: true, mensagem: 'Scout IA reprocessado com sucesso.' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Erro ao reprocessar scout.' });
   }
 });
 
