@@ -150,6 +150,34 @@ model EscalacaoPartida {
   @@unique([partida_id, numCamisa])
 }
 
+model CampeonatoClassificacao {
+  id                Int      @id @default(autoincrement())
+  temporada         String
+  titulo            String
+  divisao           String
+  categoria         String
+  eventoId          Int
+  grupo             String
+  posicao           Int
+  clube             String
+  pontos            Int
+  jogos             Int
+  vitorias          Int
+  empates           Int
+  derrotas          Int
+  golsPro           Int
+  golsContra        Int
+  saldo             Int
+  average           Float
+  mediaGolsMarcados Float
+  mediaGolsSofridos Float
+  indiceTecnico     Float
+  destaque          Boolean  @default(false)
+  atualizadoEm      DateTime @default(now())
+
+  @@index([temporada, titulo, divisao, categoria])
+}
+
 enum Role {
   ADMIN
   USER
@@ -161,68 +189,8 @@ enum TipoCategoria {
 }
 
 enum TipoCompeticao {
-  INICIACAO // Sub-7 ao Sub-10
-  BASE      // Sub-12 ao Sub-18
-}
-
-// ── JOGADORES (Elenco do Ocian) ───────────────────────────
-model Jogador {
-  id            Int       @id @default(autoincrement())
-  nome          String
-  cpf           String    @unique
-  dtNasc        DateTime  @db.Date
-  numCamisa     Int?
-  posicao       String
-  ativo         Boolean   @default(true)
-  perfil_ml     String?
-  scores_ml     Json?
-  nota_geral    Float?
-
-  categoria_id Int
-  categoria     Categoria @relation(fields: [categoria_id], references: [id])
-
-  competicoes   CompeticaoJogador[]
-  escalacoes    EscalacaoPartida[]
-  eventos       Evento[]
-
-  @@index([categoria_id])
-}
-
-// ── PARTIDAS ──────────────────────────────────────────────
-model Partida {
-  id             Int           @id @default(autoincrement())
-
-  mandante_id    Int
-  mandante       Time          @relation("Mandante",  fields: [mandante_id],  references: [id])
-
-  visitante_id   Int
-  visitante      Time          @relation("Visitante", fields: [visitante_id], references: [id])
-
-  // Nomenclaturas originais mantidas — o frontend usa esses nomes.m,lk,l
-  // Use emCasa para saber qual lado é o Ocian.
-  gols_mandante  Int           @default(0)
-  gols_visitante Int           @default(0)
-
-  horario         String?       // "19:30"
-  data            DateTime      @db.Date
-  local           String?
-  rodada          Int?
-  grupo           String?
-  emCasa          Boolean       @default(true) // true = Ocian é o mandante
-  status          StatusPartida @default(AGENDADA)       
-
-  categoria_id   Int
-  categoria      Categoria     @relation(fields: [categoria_id], references: [id])
-
-  competicao_id  Int?
-  competicao     Competicao?   @relation(fields: [competicao_id], references: [id])
-
-  jogadores_escalonados EscalacaoPartida[]
-  eventos               Evento[]
-  @@unique([competicao_id, categoria_id, rodada])
-  @@index([data])
-  @@index([categoria_id])
-  @@index([competicao_id])
+  INICIACAO
+  BASE
 }
 
 enum StatusPartida {
@@ -231,21 +199,6 @@ enum StatusPartida {
   AO_VIVO
   FINALIZADA
   CANCELADA
-}
-
-// ── EVENTOS (Scout / IA) ──────────────────────────────────
-model Evento {
-  id         Int        @id @default(autoincrement())
-  partida_id Int
-  partida    Partida    @relation(fields: [partida_id], references: [id], onDelete: Cascade)
-  tipo       TipoEvento
-  periodo    Int        // Salvará 1, 2, 3 ou 4 (1º, 2º, 3º ou 4º tempo)
-  minuto     Int?       // Ficará nulo por enquanto. Receberá o minuto exato quando houver cronômetro.
-  doOcian    Boolean    @default(true)
-  jogador_id Int?
-  jogador    Jogador?   @relation(fields: [jogador_id], references: [id])
-
-  @@index([partida_id])
 }
 
 enum TipoEvento {

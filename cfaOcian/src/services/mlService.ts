@@ -25,7 +25,7 @@ export interface Jogador {
   jogos_disputados:  number;
   gols:              number;
   assistencias:      number;
-  defesas:           number; // <--- ATUALIZADO AQUI
+  defesas:           number;
   cartoes_amarelos:  number;
   cartoes_vermelhos: number;
   faltas_cometidas:  number;
@@ -41,7 +41,24 @@ export const obterPerfisJogadores = async (categoria_id?: number): Promise<Jogad
   const query = categoria_id ? `?categoria_id=${categoria_id}` : '';
   const resposta = await fetch(`${BASE_URL}/jogadores/perfis${query}`);
   if (!resposta.ok) throw new Error(`Erro no servidor: ${resposta.status}`);
-  return resposta.json();
+  const dados: Jogador[] = await resposta.json();
+
+  return dados.map(j => ({
+    ...j,
+    scores_ml: j.scores_ml ? {
+      finalizacao:   j.scores_ml.finalizacao   ?? 0,
+      visao_de_jogo: j.scores_ml.visao_de_jogo ?? 0,
+      defesa:        j.scores_ml.defesa        ?? 0,
+      disciplina:    j.scores_ml.disciplina    ?? 0,
+      intensidade:   j.scores_ml.intensidade   ?? 0,
+      tecnica:       j.scores_ml.tecnica       ?? 0,
+    } : null,
+  }));
+};
+
+export const reprocessarScout = async (): Promise<void> => {
+  const resposta = await fetch(`${BASE_URL}/admin/reprocessar-scout`, { method: 'POST' });
+  if (!resposta.ok) throw new Error('Erro ao reprocessar Scout IA');
 };
 
 export function calcularResumo(jogadores: Jogador[]): ResumoCategoria {

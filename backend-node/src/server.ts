@@ -1,4 +1,3 @@
-// server.ts — CFA Ocian
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -7,11 +6,9 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import axios from 'axios';
-import cron from 'node-cron';
 import importacaoRoutes from './routes/importacao.routes';
-import campeonatoRoutes from './routes/campeonato.routes';
 import 'dotenv/config';
-import { sincronizarTodos } from './services/campeonato.service';
+import campeonatoRoutes from './routes/campeonato.routes';
 
 const app = express();
 const server = http.createServer(app);
@@ -21,7 +18,6 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-// ── ROTAS ──────────────────────────────────────────────────
 app.use('/partidas/importar', importacaoRoutes);
 app.use('/campeonato', campeonatoRoutes);
 
@@ -150,6 +146,16 @@ app.get('/competicoes', async (req, res) => {
   } catch (error: any) { res.status(500).json({ error: 'Erro ao buscar competições' }); }
 });
 
+app.get('/campeonato/sincronizar-todos', async (_req, res) => {
+  try {
+    const { sincronizarTodos } = require('./services/campeonato.service');
+    await sincronizarTodos();
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.delete('/competicoes/:id', async (req, res) => {
   const id = Number(req.params.id);
   try {
@@ -169,13 +175,13 @@ app.delete('/competicoes/:id', async (req, res) => {
 app.get('/competicoes/:id/jogadores', async (req, res) => {
   const competicao_id = Number(req.params.id);
   const categoria_id  = req.query.categoria_id ? Number(req.query.categoria_id) : undefined;
-
+ 
   try {
     const where: any = { competicao_id };
     if (categoria_id) {
       where.jogador = { categoria_id };
     }
-
+ 
     const inscricoes = await prisma.competicaoJogador.findMany({
       where,
       include: {
@@ -185,14 +191,14 @@ app.get('/competicoes/:id/jogadores', async (req, res) => {
       },
       orderBy: { jogador: { numCamisa: 'asc' } },
     });
-
+ 
     const resultado = inscricoes.map(i => ({
       id_jogador: i.jogador.id,
       nome:       i.jogador.nome,
       posicao:    i.jogador.posicao,
       numCamisa:  i.jogador.numCamisa,
     }));
-
+ 
     res.json(resultado);
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao buscar elenco da competição' });
@@ -205,108 +211,23 @@ app.put('/competicoes/:id/jogadores', async (req, res) => {
   if (!Array.isArray(jogador_ids)) return res.status(400).json({ error: 'jogador_ids deve ser um array' });
   try {
     await prisma.competicaoJogador.deleteMany({ where: { competicao_id } });
-
-    if (jogador_ids.length > 0) {
+    const idsValidos = jogador_ids.filter((id): id is number => id != null && !isNaN(Number(id)));
+    if (idsValidos.length > 0) {
       await prisma.competicaoJogador.createMany({
-        data: jogador_ids.map(jogador_id => ({ competicao_id, jogador_id })),
+        data: idsValidos.map(jogador_id => ({ competicao_id, jogador_id: Number(jogador_id) })),
         skipDuplicates: true,
       });
     }
-
-    const total = await prisma.competicaoJogador.count({ where: { competicao_id } });
-    res.json({ mensagem: `Elenco salvo. ${total} jogadores inscritos.` });
+    res.json({ ok: true, total: jogador_ids.length });
   } catch (error: any) {
-    res.status(500).json({ error: 'Erro ao salvar elenco' });
-  }
-});
-
-app.post('/jogadores', async (req, res) => {
-  const { nome, cpf, dtNasc, posicao, numCamisa, categoria_id } = req.body;
-  try {
-    const jogador = await prisma.jogador.create({
-      data: {
-        nome,
-        cpf,
-        dtNasc: new Date(dtNasc),
-        posicao,
-        numCamisa: numCamisa ? Number(numCamisa) : null,
-        categoria_id: Number(categoria_id),
-      },
-    });
-    res.status(201).json(jogador);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
-      res.status(409).json({ error: 'CPF já cadastrado.' });
-    } else {
-      res.status(500).json({ error: 'Erro ao criar jogador' });
-    }
-  }
-});
-
-app.patch('/jogadores/:id', async (req, res) => {
-  const { nome, cpf, dtNasc, posicao, numCamisa, categoria_id } = req.body;
-  try {
-    const jogador = await prisma.jogador.update({
-      where: { id: Number(req.params.id) },
-      data: {
-        nome,
-        cpf,
-        dtNasc: dtNasc ? new Date(dtNasc) : undefined,
-        posicao,
-        numCamisa: numCamisa !== undefined ? (numCamisa ? Number(numCamisa) : null) : undefined,
-        categoria_id: categoria_id ? Number(categoria_id) : undefined,
-      },
-    });
-    res.json(jogador);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Erro ao atualizar jogador' });
-  }
-});
-
-app.delete('/jogadores/:id', async (req, res) => {
-  try {
-    await prisma.jogador.delete({ where: { id: Number(req.params.id) } });
-    res.json({ mensagem: 'Jogador excluído' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Erro ao deletar jogador' });
-  }
-});
-
-app.get('/jogadores', async (req, res) => {
-  try {
-    const jogadores = await prisma.jogador.findMany({
-      orderBy: { nome: 'asc' },
-      include: { categoria: true },
-    });
-    res.json(jogadores);
-  } catch (error: any) {
-    res.status(500).json({ error: 'Erro ao buscar jogadores' });
-  }
-});
-
-app.get('/jogadores/perfis', async (req, res) => {
-  const categoria_id = req.query.categoria_id ? Number(req.query.categoria_id) : undefined;
-  try {
-    const where = categoria_id && categoria_id !== 0 ? { categoria_id } : {};
-    const jogadores = await prisma.jogador.findMany({
-      where,
-      orderBy: { nome: 'asc' },
-    });
-    const resultado = jogadores.map(j => ({
-      id_jogador: j.id,
-      nome:       j.nome,
-      posicao:    j.posicao,
-      numCamisa:  j.numCamisa,
-    }));
-    res.json(resultado);
-  } catch (error: any) {
-    res.status(500).json({ error: 'Erro ao buscar perfis' });
+    console.error('Erro ao salvar elenco:', error.message || error);
+    res.status(500).json({ error: 'Erro ao salvar elenco da competição' });
   }
 });
 
 app.get('/categorias', async (req, res) => {
   try {
-    const categorias = await prisma.categoria.findMany({ orderBy: { faixaIdade: 'asc' } });
+    const categorias = await prisma.categoria.findMany({ orderBy: { nome: 'asc' } });
     res.json(categorias);
   } catch (error: any) { res.status(500).json({ error: 'Erro ao buscar categorias' }); }
 });
@@ -535,7 +456,7 @@ app.post('/partidas', async (req, res) => {
         categoria_id: catId, competicao_id: compId,
         rodada: rodada ? Number(rodada) : null, grupo, status: 'AGENDADA',
       },
-      include: { mandante: true, visitante: true, categoria: true },
+      include: { mandante: true, visitante: true, categoria: true, competicao: true },
     });
     res.status(201).json(partida);
   } catch (error: any) {
@@ -545,17 +466,19 @@ app.post('/partidas', async (req, res) => {
 });
 
 app.get('/partidas', async (req, res) => {
+  const { categoria_id, mes, status, competicao_id } = req.query;
   try {
     const where: any = {};
     if (categoria_id)  where.categoria_id  = Number(categoria_id);
     if (status)        where.status        = status;
     if (competicao_id) where.competicao_id = Number(competicao_id);
     if (mes) {
-      const ano = new Date().getFullYear();
-      where.data = {
-        gte: new Date(`${ano}-${String(mes).padStart(2, '0')}-01T00:00:00Z`),
-        lt:  new Date(`${ano}-${String(mes + 1).padStart(2, '0')}-01T00:00:00Z`),
-      };
+      const ano    = new Date().getFullYear();
+      const mesNum = Number(mes);
+      // Date.UTC lida com mes=12 corretamente (vira janeiro do ano seguinte)
+      const dataInicio = new Date(Date.UTC(ano, mesNum - 1, 1));
+      const dataFim    = new Date(Date.UTC(ano, mesNum, 1));
+      where.data = { gte: dataInicio, lt: dataFim };
     }
     const partidas = await prisma.partida.findMany({
       where,
@@ -626,24 +549,38 @@ app.get('/jogadores/:id/estatisticas', async (req, res) => {
 
 app.post('/partidas/:id/eventos', async (req, res) => {
   const partidaId = parseInt(req.params.id);
-  const { jogador_id, doOcian, tipo, minuto } = req.body;
+  const { jogador_id, doOcian, tipo, minuto, periodo } = req.body;
   try {
+    // data as any contorna divergência de tipo do Prisma para campos opcionais (Int?)
     const evento = await prisma.evento.create({
       data: {
         partida_id: partidaId,
         jogador_id: jogador_id ? Number(jogador_id) : null,
-        doOcian: doOcian !== undefined ? doOcian : true,
-        tipo, minuto: Number(minuto)
-      },
-      include: { jogador: true }
+        doOcian:    doOcian !== undefined ? Boolean(doOcian) : true,
+        tipo,
+        minuto:  minuto  != null ? Number(minuto)  : null,
+        periodo: periodo != null ? Number(periodo)  : 1,
+      } as any,
     });
+
+    // Busca nome do jogador separadamente (evita conflito de tipo com include)
+    let nomeJogador = 'Adversário';
+    if (evento.jogador_id) {
+      const jog = await prisma.jogador.findUnique({
+        where: { id: evento.jogador_id },
+        select: { nome: true },
+      });
+      nomeJogador = jog?.nome ?? 'Adversário';
+    }
+
     io.emit('evento_partida', {
-      tipo: evento.tipo,
-      jogador: evento.jogador?.nome || 'Adversário',
-      minuto: evento.minuto,
-      partida_id: partidaId
+      tipo:       evento.tipo,
+      jogador:    nomeJogador,
+      minuto:     evento.minuto,
+      partida_id: partidaId,
     });
-    res.status(201).json(evento);
+
+    res.status(201).json({ ...evento, jogador: nomeJogador ? { nome: nomeJogador } : null });
   } catch (error: any) { res.status(500).json({ error: 'Erro ao salvar evento' }); }
 });
 
@@ -718,8 +655,12 @@ async function processarMachineLearning() {
   }
 }
 
-// ── ESCALAÇÃO ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// ROTAS DE ESCALAÇÃO — adicionar ao server.ts antes do listen
+// ══════════════════════════════════════════════════════════
 
+// GET /partidas/:id/escalacao
+// Retorna a escalação completa de uma partida com dados do jogador
 app.get('/partidas/:id/escalacao', async (req, res) => {
   const partidaId = Number(req.params.id);
   try {
@@ -738,6 +679,9 @@ app.get('/partidas/:id/escalacao', async (req, res) => {
   }
 });
 
+// PUT /partidas/:id/escalacao
+// Substitui a escalação inteira de uma partida (idempotente)
+// Body: { jogadores: [{ jogador_id, numCamisa, titular }] }
 app.put('/partidas/:id/escalacao', async (req, res) => {
   const partidaId = Number(req.params.id);
   const { jogadores } = req.body as {
@@ -749,13 +693,15 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
   }
 
   try {
+    // Delete sequencial — garante que os registros antigos são removidos
+    // antes de inserir os novos, evitando violação do @@unique([partida_id, numCamisa])
     await prisma.escalacaoPartida.deleteMany({ where: { partida_id: partidaId } });
     await prisma.escalacaoPartida.createMany({
       data: jogadores.map(j => ({
         partida_id: partidaId,
         jogador_id: Number(j.jogador_id),
-        numCamisa:  Number(j.numCamisa),
-        titular:    Boolean(j.titular),
+        numCamisa: Number(j.numCamisa),
+        titular: Boolean(j.titular),
       })),
     });
 
@@ -772,32 +718,15 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
   }
 });
 
-// ==========================================
-// 5. CRON — CLASSIFICAÇÃO DO CAMPEONATO
-// ==========================================
- 
-// Registrar rota (adicione junto das outras rotas, antes do server.listen)
-app.use('/campeonato', campeonatoRoutes);
- 
-// ── Sincronização ao subir o servidor ────────────────────────────────────────
-async function rodarSincronizacao() {
+// POST /admin/reprocessar-scout — força reprocessamento do Scout IA manualmente
+app.post('/admin/reprocessar-scout', async (req, res) => {
   try {
-    await sincronizarTodos();
-  } catch (err: any) {
-    console.error('[Campeonato] Falha geral na sincronização:', err.message);
+    await processarMachineLearning();
+    res.json({ ok: true, mensagem: 'Scout IA reprocessado com sucesso.' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Erro ao reprocessar scout.' });
   }
-}
- 
-rodarSincronizacao(); // Executa imediatamente ao subir
- 
-// Cron: todo dia às 6h e às 18h (ajuste conforme necessidade)
-// Para de hora em hora use: '0 * * * *'
-cron.schedule('0 6,18 * * *', () => {
-  console.log('[Campeonato] Cron disparado — sincronizando todos os eventos...');
-  rodarSincronizacao();
 });
- 
-
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT as number, '0.0.0.0', () => {

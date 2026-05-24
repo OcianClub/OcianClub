@@ -41,10 +41,10 @@ export const EVENTO_MAP: Record<string, Record<string, Record<string, number>>> 
   },
 };
 
-export const TEMPORADAS   = ['2026'];
-export const TITULOS      = ['paulista'];
-export const DIVISOES     = ['a1', 'a2', 'a3'];
-export const CATEGORIAS   = ['sub7', 'sub8', 'sub9', 'sub10', 'sub12', 'sub14', 'sub16', 'sub18'];
+export const TEMPORADAS = ['2026'];
+export const TITULOS    = ['paulista'];
+export const DIVISOES   = ['a1', 'a2', 'a3'];
+export const CATEGORIAS = ['sub7', 'sub8', 'sub9', 'sub10', 'sub12', 'sub14', 'sub16', 'sub18'];
 
 export function resolverEventoId(
   temporada: string,
@@ -80,7 +80,7 @@ export interface ClassificacaoItem {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function parseNum(val: string | undefined): number {
-  const n = Number((val ?? '').trim().replace(',', '.'));
+  const n = Number((val ?? '').trim().replace('º', '').replace(',', '.'));
   return isNaN(n) ? 0 : n;
 }
 
@@ -90,6 +90,29 @@ function parseF(val: string | undefined): number {
 }
 
 // ── Scraping ───────────────────────────────────────────────────────────────
+//
+// Estrutura confirmada por análise do HTML real (24 eventos):
+//
+//   td[0] = Grupo/Chave  (ex: "CHAVE A", "GRUPO UNICO")
+//   td[1] = Posição      (ex: "1º")
+//   td[2] = Clube        (<td> com div.row > div.col-8 contendo o nome)
+//   td[3] = Pontos
+//   td[4] = Jogos
+//   td[5] = Vitórias
+//   td[6] = Empates
+//   td[7] = Derrotas
+//   td[8] = Gols Pró
+//   td[9] = Gols Contra
+//  td[10] = Saldo
+//  td[11] = Average
+//  td[12] = Média Gols Marcados
+//  td[13] = Média Gols Sofridos
+//  td[14] = Índice Técnico
+//
+// A página contém MÚLTIPLAS .classification_table (abas por grupo + total).
+// Usamos APENAS panes sem "-chave" e sem "-total" no id para evitar duplicatas.
+// Eventos com CHAVE UNICA/GRUPO UNICO têm 1 pane; eventos com grupos (A, B…)
+// têm N panes (um por grupo) — todos são lidos e concatenados.
 
 export async function scraperClassificacao(eventoId: number): Promise<ClassificacaoItem[]> {
   const url = `https://eventos.admfutsal.com.br/evento/${eventoId}`;
@@ -102,34 +125,55 @@ export async function scraperClassificacao(eventoId: number): Promise<Classifica
     timeout: 15_000,
   });
 
-  const $ = cheerio.load(html);
+  const $   = cheerio.load(html);
   const itens: ClassificacaoItem[] = [];
+  const vistos = new Set<string>(); // chave "grupo|clube" — garante sem duplicata
 
-  $('table.classification_table tbody tr').each((_, row) => {
-    const cols = $(row).find('td');
-    if (cols.length < 15) return;
+  // Itera sobre cada tab-pane que contenha uma classification_table,
+  // ignorando os panes de resumo por chave e o pane "total"
+  $('[id^="pills-fase-"]').each((_, pane) => {
+    const paneId = $(pane).attr('id') ?? '';
 
-    const t = (i: number) => $(cols[i]).text().trim();
-    const clube = t(2);
-    if (!clube) return;
+    // Pula panes de resumo: pills-fase-XXXXX-chave  e  pills-fase-total
+    if (paneId.endsWith('-chave') || paneId === 'pills-fase-total') return;
 
-    itens.push({
-      grupo:             t(0),
-      posicao:           parseNum(t(1)),
-      clube,
-      pontos:            parseNum(t(3)),
-      jogos:             parseNum(t(4)),
-      vitorias:          parseNum(t(5)),
-      empates:           parseNum(t(6)),
-      derrotas:          parseNum(t(7)),
-      golsPro:           parseNum(t(8)),
-      golsContra:        parseNum(t(9)),
-      saldo:             parseNum(t(10)),
-      average:           parseF(t(11)),
-      mediaGolsMarcados: parseF(t(12)),
-      mediaGolsSofridos: parseF(t(13)),
-      indiceTecnico:     parseF(t(14)),
-      destaque:          clube.toLowerCase().includes('ocian'),
+    const tabela = $(pane).find('table.classification_table').first();
+    if (!tabela.length) return;
+
+    tabela.find('tbody tr').each((_, row) => {
+      const cols = $(row).find('td');
+      if (cols.length < 15) return;
+
+      const t = (i: number) => $(cols[i]).text().trim();
+
+      // O nome do clube fica dentro de div.col-8 dentro do td[2]
+      // Usar .text() direto no td[2] misturaria o alt da imagem com o nome
+      const clube = $(cols[2]).find('div.col-8').text().trim();
+      if (!clube) return;
+
+      const grupo = t(0);
+      const dedup = `${grupo}|${clube}`;
+      if (vistos.has(dedup)) return;
+      vistos.add(dedup);
+
+      itens.push({
+        grupo,
+        posicao:           parseNum(t(1)),   // "1º" → 1
+        clube,
+        pontos:            parseNum(t(3)),
+        jogos:             parseNum(t(4)),
+        vitorias:          parseNum(t(5)),
+        empates:           parseNum(t(6)),
+        derrotas:          parseNum(t(7)),
+        golsPro:           parseNum(t(8)),
+        golsContra:        parseNum(t(9)),
+        saldo:             parseNum(t(10)),
+        average:           parseF(t(11)),
+        mediaGolsMarcados: parseF(t(12)),
+        mediaGolsSofridos: parseF(t(13)),
+        indiceTecnico:     parseF(t(14)),
+        destaque:          clube.toLowerCase().includes('ocian'),
+      });
     });
   });
 
@@ -219,7 +263,7 @@ export async function buscarClassificacao(
       divisao:   divisao.toLowerCase(),
       categoria: categoria.toLowerCase(),
     },
-    orderBy: { posicao: 'asc' },
+    orderBy: [{ grupo: 'asc' }, { posicao: 'asc' }],
   });
 
   return registros.map(r => ({
