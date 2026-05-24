@@ -189,12 +189,21 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
     }
   };
 
-  // Salva de fato a súmula/elenco no banco antes de ir pra tela de jogos
+  // Salva o elenco no banco e avança para a tabela de jogos
   const avancarParaJogos = async () => {
+    // Valida que pelo menos 1 jogador foi selecionado em cada categoria do tipo do campeonato
+    const categoriasDoTipo = categorias.filter(c => getTipoCategoria(c.nome) === tipoForm);
+    const vazias = categoriasDoTipo.filter(c => !elencoSelecionado[c.id]?.length);
+    if (vazias.length > 0) {
+      return Alert.alert(
+        'Elenco incompleto',
+        `Selecione pelo menos 1 atleta em:\n${vazias.map(c => c.nome).join(', ')}`
+      );
+    }
+
     setSalvando(true);
     try {
       if (itemSelecionado && 'ano' in itemSelecionado) {
-        // Junta os IDs de todas as categorias do campeonato e manda pro banco
         const todosJogadores = (Object.values(elencoSelecionado).flat() as any[])
           .filter((id): id is number => id != null && typeof id === 'number');
         await salvarElencoCompeticao(itemSelecionado.id, todosJogadores);
@@ -624,14 +633,21 @@ const importarArquivo = async (tipo: 'documento' | 'imagem') => {
                 <View style={styles.gridCategorias}>
                   {categorias.filter(c => getTipoCategoria(c.nome) === tipoForm).map(cat => {
                     const totalSelecionados = elencoSelecionado[cat.id]?.length || 0;
+                    const vazio = totalSelecionados === 0;
                     return (
                       <TouchableOpacity key={cat.id} style={styles.cardCategoriaOcian} onPress={() => abrirSelecaoElenco(cat)}>
-                        <View style={[styles.iconCircleOcian, { backgroundColor: totalSelecionados > 0 ? colors.primary + '22' : '#2a2a2a' }]}>
-                          <MaterialCommunityIcons name={totalSelecionados > 0 ? 'check-all' : 'account-group-outline'} size={28} color={totalSelecionados > 0 ? colors.primary : colors.azulClaro} />
+                        <View style={[styles.iconCircleOcian, {
+                          backgroundColor: vazio ? colors.vermelho + '15' : colors.primary + '22',
+                        }]}>
+                          <MaterialCommunityIcons
+                            name={vazio ? 'alert-outline' : 'check-all'}
+                            size={28}
+                            color={vazio ? colors.vermelho : colors.primary}
+                          />
                         </View>
                         <Text style={styles.catOcianNome}>{cat.nome}</Text>
-                        <Text style={[styles.catOcianBadgeTxt, totalSelecionados > 0 && { color: colors.primary }]}>
-                          {totalSelecionados} selecionados
+                        <Text style={[styles.catOcianBadgeTxt, { color: vazio ? colors.vermelho : colors.primary }]}>
+                          {vazio ? 'Obrigatório' : `${totalSelecionados} selecionados`}
                         </Text>
                       </TouchableOpacity>
                     );

@@ -24,17 +24,27 @@ export interface Partida {
 }
 
 type TipoEvento = 'GOL' | 'CARTAO_AMARELO' | 'CARTAO_VERMELHO' | 'FALTA' | 'DEFESA' | 'ASSISTENCIA';
-type Periodo    = '1T' | '2T' | 'PRORROGACAO';
+type Periodo    = string;
 
 interface Props { partida: Partida; isAdmin: boolean; onBack: () => void; }
 
-const PERIODOS: { label: string; value: Periodo }[] = [
-  { label: '1º Tempo',    value: '1T' },
-  { label: '2º Tempo',    value: '2T' },
-  { label: 'Prorrogação', value: 'PRORROGACAO' },
-];
+function isHoje(dataStr: string): boolean {
+  if (!dataStr) return false;
+  const hoje = new Date();
+  const [ano, mes, dia] = dataStr.split('T')[0].split('-');
+  return (
+    hoje.getFullYear() === Number(ano) &&
+    hoje.getMonth() + 1 === Number(mes) &&
+    hoje.getDate() === Number(dia)
+  );
+}
 
-const MINUTOS_POR_PERIODO: Record<Periodo, number> = { '1T': 0, '2T': 20, 'PRORROGACAO': 40 };
+function getPeriodosPorCategoria(nomeCategoria: string | undefined): string[] {
+  const nome = (nomeCategoria ?? '').toLowerCase();
+  if (nome.includes('18') || nome.includes('16')) return ['1º Tempo', '2º Tempo'];
+  if (nome.includes('14') || nome.includes('12')) return ['1º Tempo', '2º Tempo', '3º Tempo', '4º Tempo'];
+  return ['1º Tempo', '2º Tempo'];
+}
 
 function LogoTime({ uri, size = 56 }: { uri: string | null; size?: number }) {
   if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: 10, resizeMode: 'contain', backgroundColor: '#1e1e1e' }} />;
@@ -46,8 +56,9 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
   const [golsMandante, setGolsMandante]   = useState(partidaInicial.gols_mandante);
   const [golsVisitante, setGolsVisitante] = useState(partidaInicial.gols_visitante);
   const [periodoIdx, setPeriodoIdx]       = useState(0);
-  const periodo: Periodo                  = PERIODOS[periodoIdx].value;
   const [salvandoPlacar, setSalvandoPlacar] = useState(false);
+
+  const periodos = getPeriodosPorCategoria(partida.categoria?.nome);
 
   // Estado mantido para o Modal de Eventos saber quem está no jogo
   const [escalacao, setEscalacao]           = useState<JogadorEscalado[]>([]);
@@ -95,8 +106,12 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
     if (!modalEvento || !jogadorEvento) return;
     setSalvandoEvento(true);
     try {
-      const minutoBase = MINUTOS_POR_PERIODO[periodo];
-      await criarEvento(partida.id, { tipo: modalEvento.tipo, minuto: minutoBase + 1, jogador_id: jogadorEvento.jogador_id, doOcian: true });
+      await criarEvento(partida.id, { 
+        tipo: modalEvento.tipo, 
+        minuto: periodoIdx + 1, 
+        jogador_id: jogadorEvento.jogador_id, 
+        doOcian: true 
+      });
       if (modalEvento.tipo === 'GOL') {
         const novoMandante  = partida.emCasa ? golsMandante + 1 : golsMandante;
         const novoVisitante = !partida.emCasa ? golsVisitante + 1 : golsVisitante;
@@ -213,7 +228,7 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           <View style={styles.infoBarItem}><MaterialCommunityIcons name={partida.emCasa ? 'home-outline' : 'bus'} size={16} color={colors.text_secondary} /><Text style={styles.infoBarLabel}>Mando</Text><Text style={styles.infoBarValue}>{partida.emCasa ? 'Casa' : 'Fora'}</Text></View>
         </View>
 
-        {partida.status === 'AGENDADA' && isAdmin && (
+        {partida.status === 'AGENDADA' && isAdmin && isHoje(partida.data) && (
           <View style={styles.section}>
             <TouchableOpacity style={[styles.finalizarBtn, { borderColor: colors.primary + '55', backgroundColor: colors.primary + '14' }]} onPress={iniciarPartida}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -232,9 +247,12 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 <TouchableOpacity onPress={() => setPeriodoIdx(i => Math.max(0, i - 1))} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: periodoIdx === 0 ? '#2a2a2a' : colors.primary + '22', borderWidth: 1, borderColor: periodoIdx === 0 ? '#333' : colors.primary + '66', alignItems: 'center', justifyContent: 'center' }} disabled={periodoIdx === 0}>
                   <MaterialCommunityIcons name="chevron-left" size={22} color={periodoIdx === 0 ? '#444' : colors.primary} />
                 </TouchableOpacity>
-                <View style={{ alignItems: 'center', gap: 4 }}><Text style={{ fontFamily: 'Creato-Bold', color: colors.primary, fontSize: 18, letterSpacing: 1 }}>{PERIODOS[periodoIdx].label.toUpperCase()}</Text><Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 11, letterSpacing: 0.5 }}>{periodoIdx + 1} / {PERIODOS.length}</Text></View>
-                <TouchableOpacity onPress={() => setPeriodoIdx(i => Math.min(PERIODOS.length - 1, i + 1))} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: periodoIdx === PERIODOS.length - 1 ? '#2a2a2a' : colors.primary + '22', borderWidth: 1, borderColor: periodoIdx === PERIODOS.length - 1 ? '#333' : colors.primary + '66', alignItems: 'center', justifyContent: 'center' }} disabled={periodoIdx === PERIODOS.length - 1}>
-                  <MaterialCommunityIcons name="chevron-right" size={22} color={periodoIdx === PERIODOS.length - 1 ? '#444' : colors.primary} />
+                <View style={{ alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontFamily: 'Creato-Bold', color: colors.primary, fontSize: 18, letterSpacing: 1 }}>{periodos[periodoIdx]?.toUpperCase()}</Text>
+                  <Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 11, letterSpacing: 0.5 }}>{periodoIdx + 1} / {periodos.length}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setPeriodoIdx(i => Math.min(periodos.length - 1, i + 1))} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: periodoIdx === periodos.length - 1 ? '#2a2a2a' : colors.primary + '22', borderWidth: 1, borderColor: periodoIdx === periodos.length - 1 ? '#333' : colors.primary + '66', alignItems: 'center', justifyContent: 'center' }} disabled={periodoIdx === periodos.length - 1}>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={periodoIdx === periodos.length - 1 ? '#444' : colors.primary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -253,7 +271,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </>
         )}
 
-        {/* ── INTEGRAÇÃO DO SEU NOVO COMPONENTE AQUI! ── */}
         <EscalacaoPartida
           partidaId={partida.id}
           categoriaId={partida.categoria?.id ?? null}
@@ -309,7 +326,7 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                   <View><Text style={styles.modalJogadorNome}>{jogadorEvento.jogador.nome}</Text><Text style={styles.modalJogadorPos}>{jogadorEvento.jogador.posicao}</Text></View>
                 </View>
                 <Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, marginBottom: 20 }}>Registrar <Text style={{ fontFamily: 'Creato-Bold', color: colors.text }}>{modalEvento?.label}</Text> para este jogador?</Text>
-                <Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 12, marginBottom: 6 }}>Período: {PERIODOS[periodoIdx].label}</Text>
+                <Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 12, marginBottom: 6 }}>Período: {periodos[periodoIdx]}</Text>
                 <TouchableOpacity style={[styles.saveStatBtn, salvandoEvento && { opacity: 0.6 }]} onPress={confirmarEvento} disabled={salvandoEvento}>
                   {salvandoEvento ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveStatBtnText}>CONFIRMAR</Text>}
                 </TouchableOpacity>

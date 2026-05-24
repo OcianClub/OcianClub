@@ -150,8 +150,21 @@ export async function importarPartidas({ competicaoId, conteudo, mimeType }: Imp
     }
     ocianPorCat[cat.id] = mapaTime.get(chave)!;
   }
+  const hoje = new Date();
+  const insertsPartida: any[] = [];
+  const resultado = { criados: 0, pulados: 0 };
 
   // ── 5. Chama a IA ──────────────────────────────────────────────────────────
+
+    let respostaRaw: string;
+  const model = genIA.getGenerativeModel({
+    model: 'gemini-3.1-flash-lite',
+    generationConfig: {
+      // @ts-ignore
+      thinkingConfig: { thinkingBudget: 0 }
+    }
+  });
+
   const prompt = `
 Você é especialista em ler tabelas da Federação Paulista de Futsal.
 Extraia TODOS os jogos únicos onde "Ocian" (ou "Ocian Praia Clube" / "Ocian Praia Clube/AJR") aparece.
@@ -171,23 +184,30 @@ Formato exato:
 [{"grupo":"C","data":"2026-05-02","horario":"08:00","local":"Arena Ocian","adversario":"AD GALATA","ocianMandante":false}]
 `.trim();
 
-  let respostaRaw: string;
-  const model = genIA.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-  if (mimeTypeFinal.includes('text') || mimeTypeFinal.includes('csv')) {
-    const texto   = typeof conteudoFinal === 'string' ? conteudoFinal : (conteudoFinal as Buffer).toString('utf-8');
+if (mimeTypeFinal.includes('text') || mimeTypeFinal.includes('csv')) {
+    const texto    = typeof conteudoFinal === 'string' ? conteudoFinal : (conteudoFinal as Buffer).toString('utf-8');
     const filtrado = filtrarLinhasOcian(texto);
-    const result  = await model.generateContent(`${prompt}\n\nTabela:\n${filtrado}`);
-    respostaRaw   = result.response.text().trim();
+
+    console.log('Linhas filtradas:', filtrado.split('\n').length);
+
+    console.time('gemini');
+    const result = await model.generateContent(`${prompt}\n\nTabela:\n${filtrado}`);
+    console.timeEnd('gemini');
+
+    respostaRaw = result.response.text().trim();
   } else {
-    // PDF ou imagem: envia como inlineData
+    console.time('gemini');
     const buffer = Buffer.isBuffer(conteudoFinal) ? conteudoFinal : Buffer.from(conteudoFinal as string);
     const result = await model.generateContent([
       prompt,
       { inlineData: { data: buffer.toString('base64'), mimeType: mimeTypeFinal } },
     ]);
+    console.timeEnd('gemini');
+
     respostaRaw = result.response.text().trim();
   }
+  
 
   // ── 6. Parse da resposta da IA ─────────────────────────────────────────────
   const limpa = respostaRaw.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -201,9 +221,22 @@ Formato exato:
   jogos = jogos.map((j, i) => ({ ...j, rodada: i + 1, grupo: grupoGlobal ?? j.grupo ?? null }));
 
   // ── 7. Monta inserts em memória, depois cria em batch ─────────────────────
+  console.time('prisma-loop');
+  for (const jogo of jogos) {
   const resultado = { criados: 0, pulados: 0 };
-  const insertsPartida: Parameters<typeof prisma.partida.createMany>[0]['data'] = [];
+  const insertsPartida: any[] = [];
   const hoje = new Date();
+  }
+  console.timeEnd('prisma-loop');
+
+  console.time('prisma-insert');
+  if (insertsPartida.length > 0) {
+  await prisma.partida.createMany({
+    data: insertsPartida,
+    skipDuplicates: true,
+  });
+}
+console.timeEnd('prisma-insert');
 
   for (const jogo of jogos) {
     const [horaBase, minBase] = jogo.horario.split(':').map(Number);
