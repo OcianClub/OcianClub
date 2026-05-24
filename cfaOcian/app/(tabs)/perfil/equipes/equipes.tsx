@@ -224,52 +224,81 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
   };
 
   // ── IMPORTAÇÃO VIA IA ──
-  const importarArquivo = async (tipo: 'documento' | 'imagem') => {
-    if (!itemSelecionado || !('ano' in itemSelecionado)) {
-      return Alert.alert('Atenção', 'Salve o campeonato antes de importar.');
+const importarArquivo = async (tipo: 'documento' | 'imagem') => {
+  if (!itemSelecionado || !('ano' in itemSelecionado)) {
+    return Alert.alert('Atenção', 'Salve o campeonato antes de importar.');
+  }
+ 
+  let uri: string, nome: string, mimeType: string;
+ 
+  if (tipo === 'imagem') {
+    // ── Imagem (foto da tabela) ──────────────────────────────────────────────
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+    if (result.canceled) return;
+    uri      = result.assets[0].uri;
+    nome     = result.assets[0].fileName ?? 'foto.jpg';
+    mimeType = result.assets[0].mimeType ?? 'image/jpeg';
+ 
+  } else {
+    // ── Documento: PDF, CSV, TXT, XLS, XLSX ────────────────────────────────
+    const result = await DocumentPicker.getDocumentAsync({
+      // Lista explícita + '*/*' como fallback para Android/iOS que mapeiam
+      // arquivos xlsx como application/octet-stream
+      type: [
+        'application/pdf',
+        'text/csv',
+        'text/plain',
+        'application/vnd.ms-excel',                                           
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  
+        'application/octet-stream',  
+        '*/*',                       
+      ],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+ 
+    uri      = result.assets[0].uri;
+    nome     = result.assets[0].name;
+    mimeType = result.assets[0].mimeType ?? 'application/octet-stream';
+ 
+    // Corrige o mime quando o sistema retorna genérico mas a extensão é xlsx/xls
+    const ext = nome.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (ext === 'xls')  mimeType = 'application/vnd.ms-excel';
+    if (ext === 'csv')  mimeType = 'text/csv';
+  }
+ 
+  setImportando(true);
+  setResultadoImport(null);
+ 
+  try {
+    const formData = new FormData();
+    formData.append('competicaoId', String((itemSelecionado as Competicao).id));
+    formData.append('arquivo', { uri, name: nome, type: mimeType } as any);
+ 
+    const resposta = await fetch(`${BASE_URL}/partidas/importar`, {
+      method: 'POST',
+      body: formData,
+    });
+ 
+    if (!resposta.ok) {
+      const erro = await resposta.json();
+      throw new Error(erro.error || 'Erro no servidor.');
     }
-    let uri: string, nome: string, mimeType: string;
-
-    if (tipo === 'imagem') {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9,
-      });
-      if (result.canceled) return;
-      uri = result.assets[0].uri;
-      nome = result.assets[0].fileName ?? 'foto.jpg';
-      mimeType = result.assets[0].mimeType ?? 'image/jpeg';
-    } else {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/plain', 'application/pdf'],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled) return;
-      uri = result.assets[0].uri;
-      nome = result.assets[0].name;
-      mimeType = result.assets[0].mimeType ?? 'text/plain';
-    }
-
-    setImportando(true);
-    setResultadoImport(null);
-    try {
-      const formData = new FormData();
-      formData.append('competicaoId', String((itemSelecionado as Competicao).id));
-      formData.append('arquivo', { uri, name: nome, type: mimeType } as any);
-
-      const resposta = await fetch(`${BASE_URL}/partidas/importar`, { method: 'POST', body: formData });
-      if (!resposta.ok) {
-        const erro = await resposta.json();
-        throw new Error(erro.error || 'Erro no servidor.');
-      }
-      const data = await resposta.json();
-      setResultadoImport({ criados: data.criados, pulados: data.pulados });
-      carregarDados(true);
-    } catch (err: any) {
-      Alert.alert('Erro na Importação', err.message);
-    } finally {
-      setImportando(false);
-    }
-  };
+ 
+    const data = await resposta.json();
+    setResultadoImport({ criados: data.criados, pulados: data.pulados });
+    carregarDados(true);
+ 
+  } catch (err: any) {
+    Alert.alert('Erro na Importação', err.message);
+  } finally {
+    setImportando(false);
+  }
+};
 
   // ── FUNÇÕES ADVERSÁRIOS ──
   const abrirFormAdversario = (time?: Time) => {
