@@ -509,6 +509,18 @@ app.patch('/partidas/:id', async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+app.delete('/partidas/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    await prisma.escalacaoPartida.deleteMany({ where: { partida_id: id } });
+    await prisma.evento.deleteMany({ where: { partida_id: id } });
+    await prisma.partida.delete({ where: { id } });
+    res.json({ mensagem: 'Partida excluída com sucesso.' });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || 'Erro ao excluir partida' });
+  }
+});
+
 app.patch('/partidas/:id/placar', async (req, res) => {
   const { gols_mandante, gols_visitante } = req.body;
   try {

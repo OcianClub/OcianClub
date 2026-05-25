@@ -42,6 +42,7 @@ interface Partida {
 }
 interface DiaJogo { data: string; partidas: Partida[]; }
 
+// Substituir agruparPorDia
 function agruparPorDia(partidas: Partida[]): DiaJogo[] {
   const mapa = new Map<string, Partida[]>();
   for (const p of partidas) {
@@ -54,6 +55,21 @@ function agruparPorDia(partidas: Partida[]): DiaJogo[] {
     mapa.get(chave)!.push(p);
   }
   return Array.from(mapa.entries()).map(([data, partidas]) => ({ data, partidas }));
+}
+
+// função de ordenação
+function ordenarPartidas(partidas: Partida[]): Partida[] {
+  const aoVivo = partidas.filter(p => p.status === 'AO_VIVO');
+  
+  const agendadas = partidas
+    .filter(p => p.status === 'AGENDADA')
+    .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+    
+  const finalizadas = partidas
+    .filter(p => p.status === 'FINALIZADA')
+    .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    
+  return [...aoVivo, ...agendadas, ...finalizadas];
 }
 
 function BadgeStatus({ status }: { status: Partida['status'] }) {
@@ -100,7 +116,7 @@ export default function Jogos() {
       const params: any = { mes: mesAtivo };
       if (statusFiltro !== 'TODOS') params.status = statusFiltro;
       const partidas: Partida[] = await fetchPartidas(params);
-      setDias(agruparPorDia(partidas));
+      setDias(agruparPorDia(ordenarPartidas(partidas)));
     } catch (e) {
       console.error(e);
     } finally {

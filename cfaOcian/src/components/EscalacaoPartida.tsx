@@ -31,10 +31,12 @@ export interface JogadorDisponivel {
 }
 
 interface EscalacaoPartidaProps {
-  partidaId:     number;
-  categoriaId:   number | null;
-  competicaoId?: number | null;
-  isAdmin:       boolean;
+  partidaId:      number;
+  categoriaId:    number | null;
+  competicaoId?:  number | null;
+  isAdmin:        boolean;
+  // Quando AO_VIVO → modo substituição (só escalados, não adiciona novos)
+  partidaStatus?: 'AGENDADA' | 'AO_VIVO' | 'FINALIZADA';
   onEscalacaoAtualizada?: (escalacao: JogadorEscalado[]) => void;
 }
 
@@ -81,8 +83,11 @@ const jr = {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function EscalacaoPartida({
-  partidaId, categoriaId, competicaoId, isAdmin, onEscalacaoAtualizada,
+  partidaId, categoriaId, competicaoId, isAdmin, partidaStatus, onEscalacaoAtualizada,
 }: EscalacaoPartidaProps) {
+  // Quando AO_VIVO → só permite trocar titular/banco entre já escalados
+  const modoSubstituicao = partidaStatus === 'AO_VIVO';
+
   const [escalacao,         setEscalacao]         = useState<JogadorEscalado[]>([]);
   const [disponiveis,       setDisponiveis]       = useState<JogadorDisponivel[]>([]);
   const [carregando,        setCarregando]        = useState(false);
@@ -94,7 +99,10 @@ export default function EscalacaoPartida({
   const [modalCamisa,       setModalCamisa]       = useState<JogadorDisponivel | null>(null);
   const [novaCamisa,        setNovaCamisa]        = useState('');
   const [salvandoCamisa,    setSalvandoCamisa]    = useState(false);
-
+  const [subStep,           setSubStep]           = useState<'saindo' | 'entrando'>('saindo');
+  const [subSaindo,         setSubSaindo]         = useState<number | null>(null);   // jogador_id de quem sai
+  const [subPares,          setSubPares]          = useState<{ saindo: number; entrando: number }[]>([]);
+  const MAX_SUBS = 3;
   const emCampo  = escalacao.filter(e => e.titular);
   const reservas = escalacao.filter(e => !e.titular);
 
@@ -123,17 +131,66 @@ export default function EscalacaoPartida({
     carregarDisponiveis();
   }, [carregarEscalacao, carregarDisponiveis]);
 
-  const abrirModal = () => {
-    const tits = escalacao.filter(e => e.titular).map(e => e.jogador_id);
-    const bnco = escalacao.filter(e => !e.titular).map(e => e.jogador_id);
-    setConvocados([...tits, ...bnco]);
+  // ── Abrir modal ───────────────────────────────────────────────────────────
+    const abrirModal = () => {
+    if (modoSubstituicao) {
+      setSubStep('saindo');
+      setSubSaindo(null);
+      setSubPares([]);
+    } else {
+      const tits = escalacao.filter(e => e.titular).map(e => e.jogador_id);
+      const bnco = escalacao.filter(e => !e.titular).map(e => e.jogador_id);
+      setConvocados([...tits, ...bnco]);
+    }
     setModalEscalacao(true);
   };
 
-  const toggleConvocado = (id: number) => {
-    setConvocados(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+const toggleConvocado = (id: number) => {
+    if (modoSubstituicao) {
+      // No modo substituição, os toques são gerenciados pelo novo fluxo (subStep)
+      return;
+    }
+
+    // Removendo
+    if (convocados.includes(id)) {
+      setConvocados(prev => prev.filter(i => i !== id));
+      return;
+    }
+
+    // Adicionando — verificar camisa duplicada
+    const jogadorNovo  = disponiveis.find(d => Number(d.id_jogador) === id);
+    const camisaNova   = jogadorNovo?.numCamisa;
+
+    if (camisaNova && camisaNova > 0) {
+      const duplicado = disponiveis.find(d =>
+        Number(d.id_jogador) !== id &&
+        d.numCamisa === camisaNova &&
+        convocados.includes(Number(d.id_jogador))
+      );
+      if (duplicado) {
+        Alert.alert(
+          `Camisa #${camisaNova} em uso`,
+          `${duplicado.nome} já está com a camisa ${camisaNova}.\n\nDeseja remover a camisa de ${duplicado.nome} e convocá-lo sem número?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Confirmar troca',
+              onPress: () => {
+                // Zera a camisa do outro localmente
+                setDisponiveis(prev =>
+                  prev.map(d =>
+                    d.id_jogador === duplicado.id_jogador ? { ...d, numCamisa: null } : d
+                  )
+                );
+                setConvocados(prev => [...prev, id]);
+              },
+            },
+          ]
+        );
+        return;
+      }
+    }
+    setConvocados(prev => [...prev, id]);
   };
 
   // ── Abre modal de edição de camisa ────────────────────────────────────────
@@ -153,7 +210,6 @@ export default function EscalacaoPartida({
     setSalvandoCamisa(true);
     try {
       await atualizarJogador(modalCamisa.id_jogador, { numCamisa: num });
-      // Atualiza local sem refetch completo
       setDisponiveis(prev =>
         prev.map(d =>
           d.id_jogador === modalCamisa.id_jogador ? { ...d, numCamisa: num } : d
@@ -170,6 +226,25 @@ export default function EscalacaoPartida({
       Alert.alert('Atenção', 'Convoque ao menos um jogador.');
       return;
     }
+
+    // No modo substituição, usamos dados diretamente da escalacao atual
+    // (disponiveis pode não ter todos os jogadores do time se filtrado por categoria)
+    if (modoSubstituicao) {
+      setSalvandoEscalacao(true);
+      try {
+        const payload = convocados.map((id, idx) => {
+          const esc = escalacao.find(e => e.jogador_id === id)!;
+          return { jogador_id: id, numCamisa: esc.numCamisa, titular: idx < MAX_TITULARES };
+        });
+        await salvarEscalacaoPartida(partidaId, payload);
+        await carregarEscalacao();
+        setModalEscalacao(false);
+      } catch (e: any) {
+        Alert.alert('Erro', e.message || 'Não foi possível salvar a escalação.');
+      } finally { setSalvandoEscalacao(false); }
+      return;
+    }
+
     const semCamisa = convocados
       .map(id => disponiveis.find(d => Number(d.id_jogador) === id))
       .filter(d => !d?.numCamisa || d.numCamisa <= 0);
@@ -195,6 +270,18 @@ export default function EscalacaoPartida({
     } finally { setSalvandoEscalacao(false); }
   };
 
+  // ── Lista usada no modal ────────────────────────────────────────────────
+  // AO_VIVO: só jogadores já escalados (convertidos para JogadorDisponivel)
+  // Pré-jogo: todos os disponiveis do campeonato
+  const listaModal: JogadorDisponivel[] = modoSubstituicao
+    ? escalacao.map(e => ({
+        id_jogador: e.jogador_id,
+        nome:       e.jogador.nome,
+        posicao:    e.jogador.posicao,
+        numCamisa:  e.numCamisa,
+      }))
+    : disponiveis;
+
   // ── Seção de visualização ─────────────────────────────────────────────────
   return (
     <>
@@ -206,7 +293,7 @@ export default function EscalacaoPartida({
           </View>
           {isAdmin && (
             <TouchableOpacity onPress={abrirModal}>
-              <Text style={sv.action}>ALTERAR</Text>
+              <Text style={sv.action}>{modoSubstituicao ? 'SUBSTITUIÇÃO' : 'ALTERAR'}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -248,7 +335,7 @@ export default function EscalacaoPartida({
             <TouchableOpacity onPress={() => setModalEscalacao(false)}>
               <MaterialCommunityIcons name="close" size={22} color={colors.text} />
             </TouchableOpacity>
-            <Text style={m.title}>ESCALAÇÃO</Text>
+            <Text style={m.title}>{modoSubstituicao ? 'SUBSTITUIÇÃO' : 'ESCALAÇÃO'}</Text>
             <View style={m.counter}>
               <Text style={m.counterNum}>{Math.min(convocados.length, MAX_TITULARES)}</Text>
               <Text style={m.counterSep}>/</Text>
@@ -259,164 +346,277 @@ export default function EscalacaoPartida({
           <View style={m.dica}>
             <MaterialCommunityIcons name="information-outline" size={14} color={colors.text_secondary} />
             <Text style={m.dicaTxt}>
-              Toque para convocar · Segure para editar camisa · Primeiros {MAX_TITULARES} = titulares
+              {modoSubstituicao
+                ? `Toque em um titular para mandar ao banco, ou toque em um reserva para colocar em campo · Primeiros ${MAX_TITULARES} = em campo`
+                : `Toque para convocar · Segure para editar camisa · Primeiros ${MAX_TITULARES} = titulares`
+              }
             </Text>
           </View>
 
-          {disponiveis.length === 0 ? (
+          {listaModal.length === 0 ? (
             <View style={m.empty}>
               <MaterialCommunityIcons name="account-group-outline" size={48} color="#333" />
               <Text style={m.emptyTxt}>Nenhum jogador encontrado</Text>
               <Text style={m.emptySubTxt}>
-                Verifique se o elenco foi inscrito nessa competição em Equipes → Campeonatos.
+                {modoSubstituicao
+                  ? 'Defina a escalação antes de iniciar a partida.'
+                  : 'Verifique se o elenco foi inscrito nessa competição em Equipes → Campeonatos.'
+                }
               </Text>
             </View>
           ) : (
             <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
-              {/* ── TITULARES ── */}
-              <View style={m.sectionHeader}>
-                <View style={[m.sectionDot, { backgroundColor: colors.primary }]} />
-                <Text style={m.sectionTitle}>EM CAMPO</Text>
-                <Text style={m.sectionCount}>{Math.min(convocados.length, MAX_TITULARES)}/{MAX_TITULARES}</Text>
-              </View>
+ {modoSubstituicao ? (
+                <>
+                  {/* Resumo dos pares já definidos */}
+                  {subPares.length > 0 && (
+                    <View style={{ marginBottom: 12, gap: 6 }}>
+                      {subPares.map((par, i) => {
+                        const saindo   = escalacao.find(e => e.jogador_id === par.saindo);
+                        const entrando = escalacao.find(e => e.jogador_id === par.entrando);
+                        return (
+                          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary + '10', borderRadius: 10, padding: 10, gap: 8, borderWidth: 1, borderColor: colors.primary + '30' }}>
+                            <View style={m.camisa}><Text style={m.camisaNum}>{saindo?.numCamisa}</Text></View>
+                            <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 12, flex: 1 }} numberOfLines={1}>{saindo?.jogador.nome}</Text>
+                            <MaterialCommunityIcons name="arrow-right" size={16} color={colors.primary} />
+                            <View style={m.camisa}><Text style={m.camisaNum}>{entrando?.numCamisa}</Text></View>
+                            <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 12, flex: 1 }} numberOfLines={1}>{entrando?.jogador.nome}</Text>
+                            <TouchableOpacity onPress={() => setSubPares(p => p.filter((_, j) => j !== i))}>
+                              <MaterialCommunityIcons name="close-circle" size={18} color={colors.vermelho + '88'} />
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {subPares.length < MAX_SUBS && (
+                    <>
+                      {/* Indicador de passo */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, backgroundColor: '#1a1a1a', borderRadius: 10, padding: 10 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: subStep === 'saindo' ? colors.vermelho : colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                          <MaterialCommunityIcons name={subStep === 'saindo' ? 'arrow-up-circle' : 'arrow-down-circle'} size={16} color="#fff" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 13 }}>
+                            {subStep === 'saindo' ? 'Quem SAI do campo?' : 'Quem ENTRA em campo?'}
+                          </Text>
+                          <Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 11 }}>
+                            {subStep === 'saindo'
+                              ? 'Toque no titular que vai ao banco'
+                              : `Substituindo: ${escalacao.find(e => e.jogador_id === subSaindo)?.jogador.nome ?? ''}`
+                            }
+                          </Text>
+                        </View>
+                        {subStep === 'entrando' && (
+                          <TouchableOpacity onPress={() => { setSubStep('saindo'); setSubSaindo(null); }}>
+                            <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 12 }}>← VOLTAR</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
 
-              {disponiveis.map(item => {
-                const id      = Number(item.id_jogador);
-                const pos     = convocados.indexOf(id);
-                const titular = pos >= 0 && pos < MAX_TITULARES;
-                if (!titular) return null;
-                const semCamisa = !item.numCamisa || item.numCamisa <= 0;
-                return (
-                  <TouchableOpacity
-                    key={String(item.id_jogador)}
-                    style={[m.cardTitular, semCamisa && { borderColor: colors.amarelo + '60' }]}
-                    onPress={() => toggleConvocado(id)}
-                    onLongPress={() => abrirEdicaoCamisa(item)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={m.ordem}>
-                      <Text style={m.ordemNum}>{pos + 1}</Text>
-                    </View>
-                    <View style={[m.camisa, semCamisa && { backgroundColor: colors.amarelo + '20' }]}>
-                      {semCamisa
-                        ? <MaterialCommunityIcons name="tshirt-crew-outline" size={18} color={colors.amarelo} />
-                        : <Text style={m.camisaNum}>{item.numCamisa}</Text>
-                      }
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={m.nome}>{item.nome}</Text>
-                      <Text style={m.pos}>{item.posicao}{semCamisa ? ' · Segure para definir camisa' : ''}</Text>
-                    </View>
-                    <View style={m.tagTitular}>
-                      <Text style={m.tagTitularTxt}>TITULAR</Text>
-                    </View>
-                    <MaterialCommunityIcons name="close-circle" size={20} color={colors.vermelho + '88'} />
-                  </TouchableOpacity>
-                );
-              })}
-
-              {/* Slots vazios */}
-              {Math.min(convocados.length, MAX_TITULARES) < MAX_TITULARES &&
-                Array.from({ length: MAX_TITULARES - Math.min(convocados.length, MAX_TITULARES) }).map((_, i) => (
-                  <View key={`slot-${i}`} style={m.slotVazio}>
-                    <MaterialCommunityIcons name="account-plus-outline" size={18} color="#333" />
-                    <Text style={m.slotVazioTxt}>Toque em um jogador abaixo</Text>
+                      {subStep === 'saindo' ? (
+                        /* Lista de TITULARES disponíveis para sair */
+                        escalacao
+                          .filter(e => e.titular && !subPares.find(s => s.saindo === e.jogador_id))
+                          .map(item => (
+                            <TouchableOpacity
+                              key={item.jogador_id}
+                              style={[m.cardTitular, { marginBottom: 8 }]}
+                              onPress={() => { setSubSaindo(item.jogador_id); setSubStep('entrando'); }}
+                              activeOpacity={0.8}
+                            >
+                              <View style={m.camisa}><Text style={m.camisaNum}>{item.numCamisa}</Text></View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={m.nome}>{item.jogador.nome}</Text>
+                                <Text style={m.pos}>{item.jogador.posicao}</Text>
+                              </View>
+                              <View style={m.tagTitular}><Text style={m.tagTitularTxt}>EM CAMPO</Text></View>
+                              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.vermelho} />
+                            </TouchableOpacity>
+                          ))
+                      ) : (
+                        /* Lista de RESERVAS disponíveis para entrar */
+                        escalacao
+                          .filter(e => !e.titular && !subPares.find(s => s.entrando === e.jogador_id))
+                          .map(item => (
+                            <TouchableOpacity
+                              key={item.jogador_id}
+                              style={[m.cardBancoConvocado, m.cardBanco, { marginBottom: 8 }]}
+                              onPress={() => {
+                                setSubPares(p => [...p, { saindo: subSaindo!, entrando: item.jogador_id }]);
+                                setSubStep('saindo');
+                                setSubSaindo(null);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <View style={[m.camisa, { backgroundColor: colors.text_secondary + '33' }]}>
+                                <Text style={m.camisaNum}>{item.numCamisa}</Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={m.nome}>{item.jogador.nome}</Text>
+                                <Text style={m.pos}>{item.jogador.posicao}</Text>
+                              </View>
+                              <View style={m.tagBanco}><Text style={m.tagBancoTxt}>BANCO</Text></View>
+                              <MaterialCommunityIcons name="arrow-up-circle-outline" size={20} color={colors.primary} />
+                            </TouchableOpacity>
+                          ))
+                      )}
+                      {subPares.length > 0 && (
+                        <Text style={{ fontFamily: 'Creato-Regular', color: '#555', fontSize: 11, textAlign: 'center', marginTop: 8 }}>
+                          {MAX_SUBS - subPares.length} substituição(ões) restante(s)
+                        </Text>
+                      )}
+                    </>
+                  )}
+                </>
+              ) : (
+                /* ... RENDER NORMAL DA ESCALAÇÃO PRÉ-JOGO ... */
+                <>
+                  <View style={m.sectionHeader}>
+                    <View style={[m.sectionDot, { backgroundColor: colors.primary }]} />
+                    <Text style={m.sectionTitle}>EM CAMPO</Text>
+                    <Text style={m.sectionCount}>{Math.min(convocados.length, MAX_TITULARES)}/{MAX_TITULARES}</Text>
                   </View>
-                ))
-              }
 
-              {/* ── BANCO ── */}
-              <View style={[m.sectionHeader, { marginTop: 20 }]}>
-                <View style={[m.sectionDot, { backgroundColor: colors.text_secondary }]} />
-                <Text style={m.sectionTitle}>BANCO</Text>
-                <Text style={m.sectionCount}>{Math.max(0, convocados.length - MAX_TITULARES)}</Text>
-              </View>
-
-              {disponiveis.map(item => {
-                const id        = Number(item.id_jogador);
-                const pos       = convocados.indexOf(id);
-                const convocado = pos >= 0;
-                const titular   = convocado && pos < MAX_TITULARES;
-                if (titular) return null;
-                const semCamisa = !item.numCamisa || item.numCamisa <= 0;
-                return (
-                  <TouchableOpacity
-                    key={String(item.id_jogador)}
-                    style={[m.cardBanco, convocado && m.cardBancoConvocado, semCamisa && convocado && { borderColor: colors.amarelo + '50' }]}
-                    onPress={() => toggleConvocado(id)}
-                    onLongPress={() => abrirEdicaoCamisa(item)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[m.camisa, convocado && { backgroundColor: colors.text_secondary + '33' }, semCamisa && convocado && { backgroundColor: colors.amarelo + '20' }]}>
-                      {semCamisa && convocado
-                        ? <MaterialCommunityIcons name="tshirt-crew-outline" size={16} color={colors.amarelo} />
-                        : <Text style={[m.camisaNum, { color: convocado ? colors.text : '#555' }]}>{item.numCamisa ?? '?'}</Text>
-                      }
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[m.nome, !convocado && { color: '#555' }]}>{item.nome}</Text>
-                      <Text style={m.pos}>{item.posicao}{semCamisa ? ' · Segure p/ definir camisa' : ''}</Text>
-                    </View>
-                    {convocado ? (
-                      <>
-                        <View style={m.tagBanco}><Text style={m.tagBancoTxt}>BANCO</Text></View>
+                  {listaModal.map(item => {
+                    const id      = Number(item.id_jogador);
+                    const pos     = convocados.indexOf(id);
+                    const titular = pos >= 0 && pos < MAX_TITULARES;
+                    if (!titular) return null;
+                    const semCamisa = !item.numCamisa || item.numCamisa <= 0;
+                    return (
+                      <TouchableOpacity
+                        key={String(item.id_jogador)}
+                        style={[m.cardTitular, semCamisa && { borderColor: colors.amarelo + '60' }]}
+                        onPress={() => toggleConvocado(id)}
+                        onLongPress={() => abrirEdicaoCamisa(item)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={m.ordem}><Text style={m.ordemNum}>{pos + 1}</Text></View>
+                        <View style={[m.camisa, semCamisa && { backgroundColor: colors.amarelo + '20' }]}>
+                          {semCamisa
+                            ? <MaterialCommunityIcons name="tshirt-crew-outline" size={18} color={colors.amarelo} />
+                            : <Text style={m.camisaNum}>{item.numCamisa ?? '?'}</Text>
+                          }
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={m.nome}>{item.nome}</Text>
+                          <Text style={m.pos}>{item.posicao}{semCamisa ? ' · Segure para definir camisa' : ''}</Text>
+                        </View>
+                        <View style={m.tagTitular}><Text style={m.tagTitularTxt}>TITULAR</Text></View>
                         <MaterialCommunityIcons name="close-circle" size={20} color={colors.vermelho + '88'} />
-                      </>
-                    ) : (
-                      <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#333" />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {Math.min(convocados.length, MAX_TITULARES) < MAX_TITULARES &&
+                    Array.from({ length: MAX_TITULARES - Math.min(convocados.length, MAX_TITULARES) }).map((_, i) => (
+                      <View key={`slot-${i}`} style={m.slotVazio}>
+                        <MaterialCommunityIcons name="account-plus-outline" size={18} color="#333" />
+                        <Text style={m.slotVazioTxt}>Toque em um jogador abaixo</Text>
+                      </View>
+                    ))
+                  }
+
+                  <View style={[m.sectionHeader, { marginTop: 20 }]}>
+                    <View style={[m.sectionDot, { backgroundColor: colors.text_secondary }]} />
+                    <Text style={m.sectionTitle}>BANCO</Text>
+                    <Text style={m.sectionCount}>{Math.max(0, convocados.length - MAX_TITULARES)}</Text>
+                  </View>
+
+                  {listaModal.map(item => {
+                    const id        = Number(item.id_jogador);
+                    const pos       = convocados.indexOf(id);
+                    const convocado = pos >= 0;
+                    const titular   = convocado && pos < MAX_TITULARES;
+                    if (titular) return null;
+                    const semCamisa = !item.numCamisa || item.numCamisa <= 0;
+                    return (
+                      <TouchableOpacity
+                        key={String(item.id_jogador)}
+                        style={[m.cardBanco, convocado && m.cardBancoConvocado, semCamisa && convocado && { borderColor: colors.amarelo + '50' }]}
+                        onPress={() => toggleConvocado(id)}
+                        onLongPress={() => abrirEdicaoCamisa(item)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[m.camisa, convocado && { backgroundColor: colors.text_secondary + '33' }, semCamisa && convocado && { backgroundColor: colors.amarelo + '20' }]}>
+                          {semCamisa && convocado
+                            ? <MaterialCommunityIcons name="tshirt-crew-outline" size={16} color={colors.amarelo} />
+                            : <Text style={[m.camisaNum, { color: convocado ? colors.text : '#555' }]}>{item.numCamisa ?? '?'}</Text>
+                          }
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[m.nome, !convocado && { color: '#555' }]}>{item.nome}</Text>
+                          <Text style={m.pos}>{item.posicao}{semCamisa ? ' · Segure p/ definir camisa' : ''}</Text>
+                        </View>
+                        {convocado ? (
+                          <>
+                            <View style={m.tagBanco}><Text style={m.tagBancoTxt}>BANCO</Text></View>
+                            <MaterialCommunityIcons name="close-circle" size={20} color={colors.vermelho + '88'} />
+                          </>
+                        ) : (
+                          <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#333" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              )}
             </ScrollView>
+            
           )}
 
           <TouchableOpacity
-            style={[m.salvarBtn, (salvandoEscalacao || disponiveis.length === 0) && { opacity: 0.5 }]}
+            style={[m.salvarBtn, (salvandoEscalacao || (modoSubstituicao && subPares.length === 0) || (!modoSubstituicao && listaModal.length === 0)) && { opacity: 0.5 }]}
             onPress={confirmarEscalacao}
-            disabled={salvandoEscalacao || disponiveis.length === 0}
+            disabled={salvandoEscalacao || (modoSubstituicao && subPares.length === 0) || (!modoSubstituicao && listaModal.length === 0)}
           >
             {salvandoEscalacao
               ? <ActivityIndicator color="#fff" />
-              : <Text style={m.salvarBtnTxt}>SALVAR · {convocados.length} CONVOCADO{convocados.length !== 1 ? 'S' : ''}</Text>
+              : <Text style={m.salvarBtnTxt}>
+                  {modoSubstituicao
+                    ? `CONFIRMAR ${subPares.length} SUBSTITUIÇÃO(ÕES)`
+                    : `SALVAR · ${convocados.length} CONVOCADO${convocados.length !== 1 ? 'S' : ''}`
+                  }
+                </Text>
             }
           </TouchableOpacity>
         </SafeAreaView>
-      </Modal>
 
-      {/* ── Modal de edição de camisa (long press) ────────────────────────────── */}
-      <Modal visible={!!modalCamisa} transparent animationType="fade" onRequestClose={() => setModalCamisa(null)}>
-        <View style={mc.overlay}>
-          <View style={mc.box}>
-            <Text style={mc.titulo}>Número de Camisa</Text>
-            <Text style={mc.sub}>{modalCamisa?.nome}</Text>
-            <TextInput
-              style={mc.input}
-              placeholder="Ex: 10"
-              placeholderTextColor="#444"
-              value={novaCamisa}
-              onChangeText={v => setNovaCamisa(v.replace(/\D/g, ''))}
-              keyboardType="numeric"
-              maxLength={2}
-              autoFocus
-            />
-            <View style={mc.btnRow}>
-              <TouchableOpacity style={mc.btnCancel} onPress={() => setModalCamisa(null)}>
-                <Text style={mc.btnCancelTxt}>CANCELAR</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[mc.btnSave, salvandoCamisa && { opacity: 0.6 }]}
-                onPress={salvarCamisa}
-                disabled={salvandoCamisa}
-              >
-                {salvandoCamisa
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={mc.btnSaveTxt}>SALVAR</Text>
-                }
-              </TouchableOpacity>
+        {/* ── Modal de edição de camisa (long press) — apenas pré-jogo ────────── */}
+        <Modal visible={!!modalCamisa} transparent animationType="fade" onRequestClose={() => setModalCamisa(null)}>
+          <View style={mc.overlay}>
+            <View style={mc.box}>
+              <Text style={mc.titulo}>Número de Camisa</Text>
+              <Text style={mc.sub}>{modalCamisa?.nome}</Text>
+              <TextInput
+                style={mc.input}
+                placeholder="Ex: 10"
+                placeholderTextColor="#444"
+                value={novaCamisa}
+                onChangeText={v => setNovaCamisa(v.replace(/\D/g, ''))}
+                keyboardType="numeric"
+                maxLength={2}
+                autoFocus
+              />
+              <View style={mc.btnRow}>
+                <TouchableOpacity style={mc.btnCancel} onPress={() => setModalCamisa(null)}>
+                  <Text style={mc.btnCancelTxt}>CANCELAR</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[mc.btnSave, salvandoCamisa && { opacity: 0.6 }]}
+                  onPress={salvarCamisa}
+                  disabled={salvandoCamisa}
+                >
+                  {salvandoCamisa
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={mc.btnSaveTxt}>SALVAR</Text>
+                  }
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </Modal>
       </Modal>
     </>
   );
