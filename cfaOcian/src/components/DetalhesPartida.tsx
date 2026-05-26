@@ -568,7 +568,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.root}>
-      {/* ── HEADER ── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBackBtn} onPress={onBack}>
           <MaterialCommunityIcons name="arrow-left" size={20} color={colors.text} />
@@ -599,7 +598,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ── HERO ── */}
         <View style={styles.hero}>
           <View style={styles.heroCatRow}>
             <Text style={styles.heroCatText}>{partida.categoria?.nome ?? '—'}</Text>
@@ -609,19 +607,16 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
             </Text>
           </View>
           <View style={styles.heroTeamsRow}>
-            {/* MANDANTE */}
             <View style={styles.heroTeamCol}>
               <LogoTime uri={partida.mandante.escudo} size={64} />
               <Text style={styles.heroTeamName} numberOfLines={2}>{partida.mandante.nome}</Text>
             </View>
-            
-            {/* PLACAR */}
+
             <View style={styles.heroScoreBlock}>
               {partida.status === 'AGENDADA' ? (
                 <Text style={styles.heroVs}>VS</Text>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {/* Score mandante */}
                   {isInterativo ? (
                     <View style={{ alignItems: 'center', gap: 6 }}>
                       <TouchableOpacity
@@ -644,8 +639,7 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                   )}
                   
                   <View style={styles.heroScoreSeparator} />
-                  
-                  {/* Score visitante */}
+
                   {isInterativo ? (
                     <View style={{ alignItems: 'center', gap: 6 }}>
                       <TouchableOpacity
@@ -688,8 +682,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 </View>
               )}
             </View>
-            
-            {/* VISITANTE */}
             <View style={styles.heroTeamCol}>
               <LogoTime uri={partida.visitante.escudo} size={64} />
               <Text style={styles.heroTeamName} numberOfLines={2}>{partida.visitante.nome}</Text>
@@ -697,7 +689,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </View>
         </View>
 
-        {/* ── INFO BAR ── */}
         <View style={styles.infoBar}>
           <View style={styles.infoBarItem}>
             <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.text_secondary} />
@@ -718,7 +709,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </View>
         </View>
 
-        {/* ── INICIAR ── */}
         {partida.status === 'AGENDADA' && isAdmin && isHoje(partida.data) && (
           <View style={styles.section}>
             <TouchableOpacity
@@ -733,7 +723,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </View>
         )}
 
-        {/* ── PERÍODO (AO_VIVO ou scout) ── */}
         {isInterativo && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -765,7 +754,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </View>
         )}
 
-        {/* ── EVENTOS (sem gol) ── */}
         {isInterativo && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -795,7 +783,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </View>
         )}
 
-        {/* ── HISTÓRICO DE EVENTOS ── */}
         {partida.status !== 'AGENDADA' && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -839,7 +826,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </View>
         )}
 
-        {/* ── DESEMPENHO DOS JOGADORES ── */}
         {escalacao.length > 0 && eventos.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -877,7 +863,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           </View>
         )}
 
-        {/* ── ESCALAÇÃO ── */}
         <EscalacaoPartida
           partidaId={partida.id}
           categoriaId={partida.categoria?.id ?? null}
@@ -886,7 +871,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           onEscalacaoAtualizada={setEscalacao}
         />
 
-        {/* ── FINALIZAR ── */}
         {partida.status === 'AO_VIVO' && isAdmin && (
           <View style={styles.finalizarSection}>
             <TouchableOpacity style={styles.finalizarBtn} onPress={() => setModalFinalizar(true)}>
@@ -900,23 +884,18 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* ════════════════════════════════════════════════════════════
-          MODAL: GOL — selecionar jogador ou remover gol existente
-      ════════════════════════════════════════════════════════════ */}
       <Modal visible={!!modalGol} transparent animationType="slide" onRequestClose={() => { setModalGol(null); setJogadorGol(null); setEventoGolRemover(null); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { maxHeight: '88%' }]}>
             <View style={styles.modalHandle} />
             {modalGol?.delta === 1 ? (
-              /* ── ADICIONAR GOL ── */
               !jogadorGol ? (
                 <>
                   <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 16, marginBottom: 4 }}>
-                    ⚽ Quem marcou o gol?
+                    Quem marcou o gol?
                   </Text>
                   <Text style={{ fontFamily: 'Creato-Regular', color: colors.primary, fontSize: 12, marginBottom: 16 }}>{periodos[periodoIdx]}</Text>
-                  
-                  {/* Opção gol contra */}
+
                   <TouchableOpacity
                     style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.vermelho + '15', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 10, gap: 10, borderWidth: 1, borderColor: colors.vermelho + '30' }}
                     onPress={() => confirmarGolOcian(null, true)}
@@ -967,7 +946,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                   </TouchableOpacity>
                 </>
               ) : (
-                /* Confirmar gol do jogador selecionado */
                 <>
                   <View style={styles.modalJogadorHeader}>
                     <View style={styles.modalJogadorNum}><Text style={styles.modalJogadorNumText}>{jogadorGol.numCamisa}</Text></View>
@@ -976,7 +954,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                       <Text style={styles.modalJogadorPos}>{jogadorGol.jogador.posicao}</Text>
                     </View>
                   </View>
-                  {/* Stats atuais */}
                   {(() => {
                     const s = calcularStats(eventos, jogadorGol.jogador_id);
                     return (
@@ -1062,9 +1039,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
         </View>
       </Modal>
 
-      {/* ════════════════════════════════════════════════════════════
-          MODAL: EVENTO GENÉRICO (sem gol)
-      ════════════════════════════════════════════════════════════ */}
       <Modal visible={!!modalEvento} transparent animationType="slide" onRequestClose={() => { setModalEvento(null); setJogadorEvento(null); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { maxHeight: '85%' }]}>
@@ -1146,9 +1120,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
         </View>
       </Modal>
 
-      {/* ════════════════════════════════════════════════════════════
-          MODAL: FINALIZAR PARTIDA
-      ════════════════════════════════════════════════════════════ */}
       <Modal visible={modalFinalizar} transparent animationType="fade" onRequestClose={() => setModalFinalizar(false)}>
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmBox}>
@@ -1167,12 +1138,8 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
         </View>
       </Modal>
 
-      {/* ════════════════════════════════════════════════════════════
-          MODAL: EDITAR PARTIDA (full-screen)
-      ════════════════════════════════════════════════════════════ */}
       <Modal visible={modalEditar} transparent={false} animationType="slide" onRequestClose={() => setModalEditar(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-          {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1e1e1e', gap: 12 }}>
             <TouchableOpacity onPress={() => setModalEditar(false)} style={{ padding: 4 }}>
               <MaterialCommunityIcons name="arrow-left" size={22} color={colors.text} />
@@ -1192,7 +1159,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
             </View>
           ) : (
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-              {/* CONFRONTO */}
               <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 11, letterSpacing: 1, marginBottom: 10 }}>CONFRONTO</Text>
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
                 {(['mandante', 'visitante'] as const).map((tipo, idx) => {
@@ -1228,7 +1194,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 })}
               </View>
 
-              {/* MANDO */}
               <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 11, letterSpacing: 1, marginBottom: 10 }}>MANDO DE CAMPO</Text>
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
                 {[{ label: 'EM CASA', icon: 'home-outline' as const, value: true }, { label: 'FORA', icon: 'bus-side' as const, value: false }].map(opt => (
@@ -1244,7 +1209,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 ))}
               </View>
 
-              {/* RODADA */}
               <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 11, letterSpacing: 1, marginBottom: 10 }}>RODADA</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', overflow: 'hidden', marginBottom: 20 }}>
                 <TouchableOpacity
@@ -1265,7 +1229,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 </TouchableOpacity>
               </View>
 
-              {/* DATA + HORÁRIO */}
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 11, letterSpacing: 1, marginBottom: 8 }}>DATA</Text>
@@ -1283,14 +1246,12 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 </View>
               </View>
 
-              {/* LOCAL */}
               <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 11, letterSpacing: 1, marginBottom: 8 }}>LOCAL DA PARTIDA</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', paddingHorizontal: 12, paddingVertical: 13, gap: 8, marginBottom: 28 }}>
                 <MaterialCommunityIcons name="map-marker-outline" size={17} color={colors.text_secondary} />
                 <TextInput style={{ flex: 1, fontFamily: 'Creato-Regular', color: colors.text, fontSize: 14 }} value={editLocal} onChangeText={setEditLocal} placeholder="Ginásio, quadra ou campo..." placeholderTextColor={colors.text_secondary} />
               </View>
 
-              {/* SALVAR */}
               <TouchableOpacity
                 onPress={salvarEdicaoPartida}
                 disabled={salvandoEdicao}
@@ -1308,7 +1269,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* DELETAR */}
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.vermelho + '40', backgroundColor: colors.vermelho + '10' }}
                 onPress={() => { setModalEditar(false); setTimeout(() => setModalDeletar(true), 300); }}
@@ -1320,7 +1280,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           )}
         </SafeAreaView>
 
-        {/* Modal de seleção de time dentro do editar */}
         <Modal visible={modalTimeEdit !== null} transparent animationType="slide">
           <Pressable style={{ flex: 1, backgroundColor: '#000a', justifyContent: 'flex-end' }} onPress={() => { setModalTimeEdit(null); setBuscaTime(''); }}>
             <Pressable style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '80%', padding: 20 }}>
@@ -1374,9 +1333,6 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
         </Modal>
       </Modal>
 
-      {/* ════════════════════════════════════════════════════════════
-          MODAL: CONFIRMAR DELETAR
-      ════════════════════════════════════════════════════════════ */}
       <Modal visible={modalDeletar} transparent animationType="fade" onRequestClose={() => setModalDeletar(false)}>
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmBox}>

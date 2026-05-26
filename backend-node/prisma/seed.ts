@@ -5,8 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
     console.log("🧼 Fazendo uma limpa nas partidas, eventos e tabelas dependentes...");
-    
-    // Deleta em ordem reversa de chaves estrangeiras para não dar erro P2003
+
     await prisma.evento.deleteMany({});
     await prisma.escalacaoPartida.deleteMany({});
     await prisma.partida.deleteMany({});
@@ -36,7 +35,7 @@ async function main() {
             create: { nome: nome, tipo: TipoCategoria.BASE, faixaIdade: parseInt(nome.replace('sub-', '')) },
         });
     }
-    console.log("✅ Categorias de Iniciação e Base criadas/verificadas.");
+    console.log("Categorias de Iniciação e Base criadas/verificadas.");
 
     // ── 2. SEED DE ADMIN ───────────────────────────────────────────────
     const hashSenha = await bcrypt.hash('123456', 10);
@@ -50,7 +49,7 @@ async function main() {
             role: Role.ADMIN,
         },
     });
-    console.log('✅ Usuário Admin verificado (admin@ocian.com / 123456).');
+    console.log('Usuário Admin verificado (admin@ocian.com / 123456).');
 
     // ── 3. SEED DE TESTE EM MASSA ALINHADO AO NOVO SCHEMA ──────────────
     console.log("⚽ Gerando elencos (6 atletas), partidas e times por sub correspondente...");
@@ -148,10 +147,10 @@ async function main() {
             ]
         });
 
-        console.log(`⚡ Estrutura completa injetada para o [${cat.nome.toUpperCase()}]`);
+        console.log(`Estrutura completa injetada para o [${cat.nome.toUpperCase()}]`);
     }
 
-    console.log('🚀 Seeding concluído com sucesso e tabelas limpas!');
+    console.log('Seeding concluído com sucesso e tabelas limpas!');
 }
 
 main()

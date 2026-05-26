@@ -1,4 +1,3 @@
-// app/(tabs)/placar/campeonato.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, RefreshControl,
@@ -13,7 +12,6 @@ import {
   FiltrosCampeonato,
 } from '@/src/services/api';
 
-// IMPORTAÇÃO DOS ESTILOS MESCLADOS
 import { styles as s } from '@/src/styles/placarStyles';
 
 // ── Filtros estáticos ─────────────────────────────────────────────────────────
@@ -47,16 +45,14 @@ function tempoDesde(date: Date): string {
   return `há ${Math.floor(diff / 3600)}h`;
 }
 
-// Extrai a letra do grupo: "GRUPO C" → "C", "CHAVE A" → "A", "1ª FASE - B" → "B"
 function labelDoGrupo(tipoTabela: string): string {
   if (tipoTabela === 'GERAL') return 'Geral';
   const m = tipoTabela.match(/\b([A-Z])\s*$/);
-  if (m) return m[1]; // "GRUPO A" → "A", "CHAVE A" → "A"
+  if (m) return m[1];
   return tipoTabela;
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
-
 function SkeletonRow() {
   return (
     <View style={[s.tableRow, s.rowBorder]}>
@@ -71,7 +67,6 @@ function SkeletonRow() {
 }
 
 // ── Banner ────────────────────────────────────────────────────────────────────
-
 function CampeonatoBanner({ divisao, categoria }: { divisao: Divisao; categoria: Categoria }) {
   return (
     <View style={s.banner}>
@@ -89,7 +84,6 @@ function CampeonatoBanner({ divisao, categoria }: { divisao: Divisao; categoria:
 }
 
 // ── Card do Ocian ─────────────────────────────────────────────────────────────
-
 function OcianCard({ time }: { time: ClassificacaoItem }) {
   const stats = [
     { label: 'PTS', value: String(time.pontos) },
@@ -125,7 +119,6 @@ function OcianCard({ time }: { time: ClassificacaoItem }) {
 }
 
 // ── Linha da tabela ───────────────────────────────────────────────────────────
-
 function ClassificacaoRow({ time, isLast }: { time: ClassificacaoItem; isLast: boolean }) {
   const iniciais = time.clube.split(' ').filter(Boolean).map(p => p[0]).join('').slice(0, 3);
   return (
@@ -153,7 +146,6 @@ function ClassificacaoRow({ time, isLast }: { time: ClassificacaoItem; isLast: b
 }
 
 // ── Chip ──────────────────────────────────────────────────────────────────────
-
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <TouchableOpacity style={[s.chip, active && s.chipActive]} onPress={onPress} activeOpacity={0.75}>
@@ -190,7 +182,6 @@ function OcianCardVazio() {
 }
 
 // ── Tabela ────────────────────────────────────────────────────────────────────
-
 function Tabela({ times }: { times: ClassificacaoItem[] }) {
   if (times.length === 0) return null;
   return (
@@ -215,15 +206,12 @@ function Tabela({ times }: { times: ClassificacaoItem[] }) {
 }
 
 // ── Tela principal ────────────────────────────────────────────────────────────
-
 export default function Campeonato() {
-  // Filtros 1 e 2 — Divisão e Sub
 const [divisao,   setDivisao]   = useState<Divisao>('a3');
 const [categoria, setCategoria] = useState<Categoria>('sub12');
 
-  // Filtro 3 — Grupo (A, B, C, Geral) — populado dinamicamente pela API
   const [grupoAtivo, setGrupoAtivo] = useState<string>(GERAL);
-  const [grupos,     setGrupos]     = useState<string[]>([]); // nomes exatos vindos da API
+  const [grupos,     setGrupos]     = useState<string[]>([]);
 
   const [loading,      setLoading]      = useState(true);
   const [refreshing,   setRefreshing]   = useState(false);
@@ -246,7 +234,6 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
       const dados = await fetchClassificacaoCampeonato(filtros);
       setTabela(dados);
 
-      // Extrai grupos únicos preservando ordem de chegada da API
       const gruposUnicos = [...new Set(
         dados
           .filter(t => t.tipoTabela !== 'GERAL' && !t.tipoTabela.includes('UNIC'))
@@ -256,7 +243,6 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
       setGrupos(gruposUnicos);
       setAtualizadoEm(new Date());
 
-      // Seleciona automaticamente o grupo do Ocian; fallback: Geral
       const grupoOcian = dados.find(t => t.destaque && t.tipoTabela !== 'GERAL')?.tipoTabela;
       setGrupoAtivo(grupoOcian ?? GERAL);
     } catch (e) {
@@ -268,23 +254,17 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
     }
   }, [divisao, categoria]);
 
-  // Recarrega sempre que divisão ou sub mudar
   useEffect(() => { carregar(); }, [carregar]);
 
   // ── Dados filtrados pelo grupo ativo ─────────────────────────────────────────
-
-  // Geral: todos os times ordenados por posição
-  // Grupo específico: só os times daquele grupo
   const timesVisiveis: ClassificacaoItem[] =
   grupoAtivo === GERAL
     ? tabela.filter(t => t.tipoTabela === 'GERAL')
     : tabela.filter(t => t.tipoTabela === grupoAtivo);
 
-  // Card do Ocian: busca no grupo visível; se não achar, busca em todos
   const ocianReal = timesVisiveis.find(t => t.destaque) ?? tabela.find(t => t.destaque) ?? null;
 
-  // ── Render ────────────────────────────────────────────────────────────────────
-
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <View style={s.container}>
       <Header
@@ -295,10 +275,8 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
         btnNotificacao="bell"
       />
 
-      {/* Banner */}
       <CampeonatoBanner divisao={divisao} categoria={categoria} />
 
-      {/* ── Filtro 1: Divisão ───────────────────────────── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.chipRow} style={s.chipScroll}>
         {DIVISOES.map(d => (
@@ -306,7 +284,6 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
         ))}
       </ScrollView>
 
-      {/* ── Filtro 2: Sub ───────────────────────────────── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.chipRow} style={s.chipScroll}>
         {CATEGORIAS.map(c => (
@@ -314,10 +291,6 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
         ))}
       </ScrollView>
 
-      {/* ── Filtro 3: Grupo (A / B / C / Geral) ─────────
-            Só aparece após carregar e se tiver mais de 1 grupo.
-            Exibe letra extraída do nome (ex: "GRUPO C" → "C").
-            "Geral" sempre aparece no fim.                     */}
       {!loading && grupos.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.grupoRow} style={s.grupoScroll}>
@@ -345,7 +318,6 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
         </ScrollView>
       )}
 
-      {/* ── Conteúdo ─────────────────────────────────────── */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.content}
@@ -391,14 +363,10 @@ const [categoria, setCategoria] = useState<Categoria>('sub12');
               ) : (
                 <OcianCardVazio />
               )}
-
-            {/* Tabela única do grupo/geral selecionado */}
             <Tabela times={timesVisiveis} />
-
             <View style={{ height: 8 }} />
           </>
         )}
-
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>

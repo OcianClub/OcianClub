@@ -157,7 +157,7 @@ model CampeonatoClassificacao {
   divisao           String
   categoria         String
   eventoId          Int
-  tipoTabela        String   // "GERAL" | "GRUPO A" | "GRUPO B" | "CHAVE A" etc.
+  tipoTabela        String
   grupo             String
   posicao           Int
   clube             String

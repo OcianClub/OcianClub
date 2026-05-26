@@ -152,7 +152,6 @@ export default function Jogos() {
       <Header title="JOGOS" btnNotificacao="bell" showLogo={false} icon="soccer" showProfile={true} />
 
       <View style={styles.filtersContainer}>
-        {/* Lado a Lado: Mês e Status */}
         <View style={styles.filterRow}>
           <TouchableOpacity activeOpacity={0.7} style={styles.filterBtn} onPress={() => setModalMesVisible(true)}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -300,12 +299,10 @@ export default function Jogos() {
         </TouchableOpacity>
       )}
 
-      {/* MODAL ORGANIZAR */}
       <Modal visible={modalOrganizar} transparent={false} animationType="slide" onRequestClose={() => setModalOrganizar(false)}>
         <OrganizarPartidas noModal={true} onFechar={() => { setModalOrganizar(false); carregarPartidas(); }} />
       </Modal>
 
-      {/* MODAL MÊS */}
       <Modal visible={modalMesVisible} transparent={true} animationType="fade" onRequestClose={() => setModalMesVisible(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setModalMesVisible(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>

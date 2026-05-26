@@ -15,7 +15,6 @@ const LARGURA_BOTAO = 32;
 const PADDING_H = 8;
 const LARGURA_TRACK = LARGURA_DISPONIVEL - LARGURA_BOTAO * 2 - PADDING_H * 2;
 
-// Padding para centralizar o item ativo no meio do track
 const PADDING_CENTRALIZADOR = (LARGURA_TRACK - LARGURA_ITEM) / 2;
 
 export const SUBS_INICIACAO = [
@@ -133,7 +132,6 @@ export function CarrosselSubs({
   return (
     <View style={styles.wrapper}>
 
-      {/* ── TOGGLE ── */}
       <View style={styles.tipoSwitchContainer}>
         {(['INICIACAO', 'BASE'] as const).map(tipo => (
           <TouchableOpacity
@@ -221,7 +219,6 @@ export function CarrosselSubs({
         </TouchableOpacity>
       </View>
 
-      {/* ── DOTS ── */}
       <DotIndicator
         total={dadosAtuais.length}
         current={indexAtual}
@@ -239,7 +236,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
 
-  // ── TOGGLE ──
   tipoSwitchContainer: {
     flexDirection: 'row',
     backgroundColor: '#1A1A1A',

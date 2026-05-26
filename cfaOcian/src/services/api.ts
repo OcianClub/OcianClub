@@ -1,36 +1,67 @@
 import * as SecureStore from 'expo-secure-store';
 
-// export const BASE_URL = 'http://10.0.2.2:3000';
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ocianclub-node.onrender.com';
+
+export interface ClassificacaoItem {
+  grupo: string;
+  posicao: number;
+  clube: string;
+  pontos: number;
+  jogos: number;
+  vitorias: number;
+  empates: number;
+  derrotas: number;
+  golsPro: number;
+  golsContra: number;
+  saldo: number;
+  average: number;
+  mediaGolsMarcados: number;
+  mediaGolsSofridos: number;
+  indiceTecnico: number;
+  destaque: boolean;
+  tipoTabela: string;
+}
+
+export interface FiltrosCampeonato {
+  temporada: string;
+  titulo: string;
+  divisao: string;
+  categoria: string;
+}
 
 async function getToken() {
   return await SecureStore.getItemAsync('userToken');
 }
 
-export async function fetchJogadoresPorCompeticao(comp_id: number): Promise<any[]> {
-  const res = await fetch(`${BASE_URL}/competicoes/${comp_id}/jogadores`);
-  if (!res.ok) throw new Error('Erro ao buscar elenco do campeonato');
-  return res.json();
-}
-export async function atualizarIdadesJogadores(): Promise<{ atualizados: number; desativados: number }> {
-  const res = await fetch(`${BASE_URL}/admin/atualizar-idades`, { method: 'PATCH' });
-  if (!res.ok) throw new Error('Erro ao atualizar idades');
-  return res.json();
-}
-// Substitui o elenco de uma competição por completo (idempotente).
-export async function salvarElencoCompeticao(comp_id: number, jogador_ids: number[]): Promise<void> {
-  const res = await fetch(`${BASE_URL}/competicoes/${comp_id}/jogadores`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jogador_ids }),
+export async function atualizarUsuario(dados: { nome: string; email: string; senha?: string }) {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/usuarios/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(dados),
   });
-  if (!res.ok) throw new Error('Erro ao salvar elenco da competição');
+  if (!res.ok) throw new Error('Erro ao atualizar dados');
+  return res.json();
 }
 
-export async function fetchJogadoresPerfis(categoria_id?: number): Promise<any[]> {
-  const query = categoria_id ? `?categoria_id=${categoria_id}` : '';
-  const res = await fetch(`${BASE_URL}/jogadores/perfis${query}`);
-  if (!res.ok) throw new Error('Erro ao buscar perfis');
+export async function excluirConta() {
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}/usuarios/me`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) throw new Error('Erro ao excluir conta');
+  return res.json();
+}
+
+export async function fetchCategorias() {
+  const res = await fetch(`${BASE_URL}/categorias`);
+  if (!res.ok) throw new Error('Erro ao buscar categorias');
   return res.json();
 }
 
@@ -60,12 +91,6 @@ export async function atualizarTime(id: number, dados: { nome: string; escudo?: 
   return res.json();
 }
 
-export async function fetchCategorias() {
-  const res = await fetch(`${BASE_URL}/categorias`);
-  if (!res.ok) throw new Error('Erro ao buscar categorias');
-  return res.json();
-}
-
 export async function deletarTime(id: number) {
   const res = await fetch(`${BASE_URL}/times/${id}`, { method: 'DELETE' });
   if (!res.ok) {
@@ -79,6 +104,20 @@ export async function fetchJogadores() {
   const res = await fetch(`${BASE_URL}/jogadores`);
   if (!res.ok) throw new Error('Erro ao buscar jogadores');
   return res.json();
+}
+
+export async function fetchJogadoresPerfis(categoria_id?: number): Promise<any[]> {
+  const query = categoria_id ? `?categoria_id=${categoria_id}` : '';
+  const res = await fetch(`${BASE_URL}/jogadores/perfis${query}`);
+  if (!res.ok) throw new Error('Erro ao buscar perfis');
+  return res.json();
+}
+
+export async function fetchPerfilJogador(id: number): Promise<any> {
+  const res = await fetch(`${BASE_URL}/jogadores/perfis?categoria_id=0`);
+  if (!res.ok) throw new Error('Erro ao buscar perfil');
+  const todos = await res.json();
+  return todos.find((j: any) => j.id_jogador === id) ?? null;
 }
 
 export async function criarJogador(dados: {
@@ -116,11 +155,16 @@ export async function deletarJogador(id: number) {
   return res.json();
 }
 
-export async function fetchPerfilJogador(id: number): Promise<any> {
-  const res = await fetch(`${BASE_URL}/jogadores/perfis?categoria_id=0`);
-  if (!res.ok) throw new Error('Erro ao buscar perfil');
-  const todos = await res.json();
-  return todos.find((j: any) => j.id_jogador === id) ?? null;
+export async function atualizarIdadesJogadores(): Promise<{ atualizados: number; desativados: number }> {
+  const res = await fetch(`${BASE_URL}/admin/atualizar-idades`, { method: 'PATCH' });
+  if (!res.ok) throw new Error('Erro ao atualizar idades');
+  return res.json();
+}
+
+export async function fetchCompeticoes() {
+  const res = await fetch(`${BASE_URL}/competicoes`);
+  if (!res.ok) throw new Error('Erro ao buscar competicoes');
+  return res.json();
 }
 
 export async function criarCompeticao(dados: { nome: string; ano: number }) {
@@ -152,28 +196,40 @@ export async function deletarCompeticao(id: number) {
   return res.json();
 }
 
-export async function fetchPartidasPorCompeticao(competicao_id: number, categoria_id?: number) {
-  const query = new URLSearchParams({ competicao_id: String(competicao_id) });
-  if (categoria_id) query.append('categoria_id', String(categoria_id));
-  const res = await fetch(`${BASE_URL}/partidas?${query}`);
-  if (!res.ok) throw new Error('Erro ao buscar partidas da competição');
+export async function fetchJogadoresPorCompeticao(comp_id: number): Promise<any[]> {
+  const res = await fetch(`${BASE_URL}/competicoes/${comp_id}/jogadores`);
+  if (!res.ok) throw new Error('Erro ao buscar elenco do campeonato');
   return res.json();
 }
 
-export async function atualizarStatusPartida(id: number, status: string) {
-  const res = await fetch(`${BASE_URL}/partidas/${id}/status`, {
-    method: 'PATCH',
+export async function salvarElencoCompeticao(comp_id: number, jogador_ids: number[]): Promise<void> {
+  const res = await fetch(`${BASE_URL}/competicoes/${comp_id}/jogadores`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ jogador_ids }),
   });
-  if (!res.ok) throw new Error('Erro ao atualizar status');
-  return res.json();
+  if (!res.ok) throw new Error('Erro ao salvar elenco da competição');
 }
 
-export async function fetchCompeticoes() {
-  const res = await fetch(`${BASE_URL}/competicoes`);
-  if (!res.ok) throw new Error('Erro ao buscar competicoes');
-  return res.json();
+export async function fetchClassificacaoCampeonato(
+  filtros: FiltrosCampeonato,
+): Promise<ClassificacaoItem[]> {
+  const params = new URLSearchParams({
+    temporada: filtros.temporada,
+    titulo:    filtros.titulo,
+    divisao:   filtros.divisao,
+    categoria: filtros.categoria,
+  });
+
+  const res = await fetch(`${BASE_URL}/campeonato/classificacao?${params}`);
+  
+  if (!res.ok) {
+    const body = await res.text().catch(() => '(sem body)');
+    throw new Error(`[${res.status}] ${body}`);
+  }
+
+  const json = await res.json();
+  return Array.isArray(json) ? json : json.data ?? [];
 }
 
 export async function fetchPartidas(params?: {
@@ -195,6 +251,14 @@ export async function fetchPartidas(params?: {
     throw new Error(`Erro ao buscar partidas (${res.status}): ${corpo || res.statusText}`);
   }
 
+  return res.json();
+}
+
+export async function fetchPartidasPorCompeticao(competicao_id: number, categoria_id?: number) {
+  const query = new URLSearchParams({ competicao_id: String(competicao_id) });
+  if (categoria_id) query.append('categoria_id', String(categoria_id));
+  const res = await fetch(`${BASE_URL}/partidas?${query}`);
+  if (!res.ok) throw new Error('Erro ao buscar partidas da competição');
   return res.json();
 }
 
@@ -233,6 +297,16 @@ export async function atualizarPartida(id: number, dados: {
   return res.json();
 }
 
+export async function atualizarStatusPartida(id: number, status: string) {
+  const res = await fetch(`${BASE_URL}/partidas/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error('Erro ao atualizar status');
+  return res.json();
+}
+
 export async function atualizarPlacarPartida(id: number, gols_mandante: number, gols_visitante: number) {
   const res = await fetch(`${BASE_URL}/partidas/${id}/placar`, {
     method: 'PATCH',
@@ -241,6 +315,12 @@ export async function atualizarPlacarPartida(id: number, gols_mandante: number, 
   });
   if (!res.ok) throw new Error('Erro ao atualizar placar');
   return res.json();
+}
+
+export async function fetchEventosDaPartida(partidaId: number) {
+  const response = await fetch(`${BASE_URL}/partidas/${partidaId}/eventos`);
+  if (!response.ok) throw new Error('Falha ao buscar eventos');
+  return await response.json();
 }
 
 export async function criarEvento(partida_id: number, dados: {
@@ -259,14 +339,7 @@ export async function criarEvento(partida_id: number, dados: {
   return res.json();
 }
 
-// src/services/api.ts
-export const fetchEventosDaPartida = async (partidaId: number) => {
-  const response = await fetch(`${BASE_URL}/partidas/${partidaId}/eventos`);
-  if (!response.ok) throw new Error('Falha ao buscar eventos');
-  return await response.json();
-};
-
-export const deletarEvento = async (eventoId: number) => {
+export async function deletarEvento(eventoId: number) {
   const response = await fetch(`${BASE_URL}/eventos/${eventoId}`, { 
     method: 'DELETE',
     headers: {
@@ -275,9 +348,7 @@ export const deletarEvento = async (eventoId: number) => {
   });
   if (!response.ok) throw new Error('Falha ao deletar evento');
   return await response.json();
-};
-
-// ── ESCALAÇÃO ──────────────────────────────────────────────────────────────
+}
 
 export async function fetchEscalacaoPartida(partida_id: number): Promise<any[]> {
   const res = await fetch(`${BASE_URL}/partidas/${partida_id}/escalacao`);
@@ -300,66 +371,6 @@ export async function salvarEscalacaoPartida(
   }
 }
 
-export interface ClassificacaoItem {
-  grupo: string;
-  posicao: number;
-  clube: string;
-  pontos: number;
-  jogos: number;
-  vitorias: number;
-  empates: number;
-  derrotas: number;
-  golsPro: number;
-  golsContra: number;
-  saldo: number;
-  average: number;
-  mediaGolsMarcados: number;
-  mediaGolsSofridos: number;
-  indiceTecnico: number;
-  destaque: boolean;
-  tipoTabela: string;
-}
- 
-export interface FiltrosCampeonato {
-  temporada: string; // "2026"
-  titulo: string;    // "paulista"
-  divisao: string;   // "a1" | "a2" | "a3"
-  categoria: string; // "sub12" | "sub14" etc.
-}
- 
-export async function fetchClassificacaoCampeonato(
-  filtros: FiltrosCampeonato,
-): Promise<ClassificacaoItem[]> {
-  const params = new URLSearchParams({
-    temporada: filtros.temporada,
-    titulo:    filtros.titulo,
-    divisao:   filtros.divisao,
-    categoria: filtros.categoria,
-  });
-
-  const res = await fetch(`${BASE_URL}/campeonato/classificacao?${params}`);
-  
-  if (!res.ok) {
-    const body = await res.text().catch(() => '(sem body)');
-    throw new Error(`[${res.status}] ${body}`);  // ← mostra status + body real
-  }
-
-  const json = await res.json();
-  return Array.isArray(json) ? json : json.data ?? [];
-}
-
-
-
-/**
- * Busca jogadores disponíveis para escalar em uma partida.
- *
- * PRIORIDADE:
- *   1. Se a partida tiver competicao_id → busca apenas os inscritos nessa competição,
- *      filtrando pela categoria da partida. Isso respeita a súmula do campeonato.
- *   2. Se não tiver competição (jogo amistoso) → busca todos da categoria.
- *
- * Retorna: [{ id_jogador, nome, posicao, numCamisa }]
- */
 export async function fetchJogadoresParaEscalacao(
   categoria_id: number,
   competicao_id?: number | null,
@@ -371,9 +382,6 @@ export async function fetchJogadoresParaEscalacao(
     if (!res.ok) throw new Error('Erro ao buscar elenco da competição');
     const data: any[] = await res.json();
 
-    // Normaliza: a rota original retorna { id, nome, ... }
-    // o patch do servidor retorna { id_jogador, nome, ... }
-    // suportamos os dois shapes
     return data
       .map(j => ({
         id_jogador: j.id_jogador ?? j.id,
@@ -384,7 +392,6 @@ export async function fetchJogadoresParaEscalacao(
       .filter(j => j.id_jogador != null);
   }
 
-  // Fallback: amistoso — qualquer jogador da categoria
   const res = await fetch(`${BASE_URL}/jogadores/perfis?categoria_id=${categoria_id}`);
   if (!res.ok) throw new Error('Erro ao buscar jogadores da categoria');
   const todos: any[] = await res.json();
@@ -398,33 +405,6 @@ export async function fetchJogadoresParaEscalacao(
     .filter(j => j.id_jogador != null);
 }
 
-/** @deprecated Use fetchJogadoresParaEscalacao ao invés disso */
 export async function fetchJogadoresPorCategoria(categoria_id: number): Promise<any[]> {
   return fetchJogadoresParaEscalacao(categoria_id);
-}
-
-export async function atualizarUsuario(dados: { nome: string; email: string; senha?: string }) {
-  const token = await getToken();
-  const res = await fetch(`${BASE_URL}/usuarios/me`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(dados),
-  });
-  if (!res.ok) throw new Error('Erro ao atualizar dados');
-  return res.json();
-}
-
-export async function excluirConta() {
-  const token = await getToken();
-  const res = await fetch(`${BASE_URL}/usuarios/me`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  if (!res.ok) throw new Error('Erro ao excluir conta');
-  return res.json();
 }

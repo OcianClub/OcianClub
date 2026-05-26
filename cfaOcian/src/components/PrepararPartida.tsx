@@ -40,7 +40,7 @@ interface JogadorDisponivel {
 interface EstadoJogador {
   presente: boolean;
   titular: boolean;
-  camisa: string; // string para TextInput fácil
+  camisa: string;
 }
 
 interface Props {
@@ -52,7 +52,6 @@ interface Props {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Sub-12 para baixo: camisa fixa (vem do cadastro)
 const SUBS_CAMISA_FIXA = ['sub-7', 'sub-8', 'sub-9', 'sub-10', 'sub-12'];
 
 function camisaFixa(nomeCategoria: string) {
@@ -86,7 +85,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
       );
       setJogadores(lista);
 
-      // Estado inicial: todos ausentes, não titulares, camisa = do cadastro
       const inicial: Record<number, EstadoJogador> = {};
       lista.forEach(j => {
         inicial[j.id_jogador] = {
@@ -114,7 +112,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
   const togglePresente = (id: number) => {
     setEstado(prev => {
       const atual = prev[id];
-      // ao desmarcar presença, remove titular também
       return { ...prev, [id]: { ...atual, presente: !atual.presente, titular: false } };
     });
   };
@@ -122,7 +119,7 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
   const toggleTitular = (id: number) => {
     setEstado(prev => {
       const atual = prev[id];
-      if (!atual.presente) return prev; // não pode ser titular sem estar presente
+      if (!atual.presente) return prev;
 
       const jaTem5Titulares = titulares.length >= 5 && !atual.titular;
       if (jaTem5Titulares) {
@@ -162,7 +159,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
       return Alert.alert('Atenção', `Marque exatamente 5 titulares. (${titulares.length}/5)`);
     }
 
-    // Valida camisas para subs rotativos
     if (!fixaCamisa) {
       for (const j of presentes) {
         const camisa = estado[j.id_jogador]?.camisa?.trim();
@@ -170,7 +166,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
           return Alert.alert('Atenção', `Defina o número de camisa para ${nomeCurto(j.nome)}.`);
         }
       }
-      // Duplicatas de camisa
       const camisas = presentes.map(j => estado[j.id_jogador].camisa.trim());
       const set = new Set(camisas);
       if (set.size !== camisas.length) {
@@ -214,7 +209,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
           presente && { borderColor: titular ? colors.primary : colors.azulClaro, backgroundColor: titular ? colors.primary + '10' : colors.azulClaro + '08' },
         ]}
       >
-        {/* Presença */}
         <TouchableOpacity onPress={() => togglePresente(j.id_jogador)} style={styles.checkBox}>
           <MaterialCommunityIcons
             name={presente ? 'checkbox-marked' : 'checkbox-blank-outline'}
@@ -223,7 +217,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
           />
         </TouchableOpacity>
 
-        {/* Info */}
         <View style={styles.jogadorInfo}>
           <Text style={[styles.jogadorNome, !presente && { color: '#555' }]} numberOfLines={1}>
             {nomeCurto(j.nome)}
@@ -231,7 +224,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
           <Text style={styles.jogadorPosicao}>{j.posicao}</Text>
         </View>
 
-        {/* Camisa — só para presentes */}
         {presente && (
           fixaCamisa ? (
             <View style={styles.camisaBadge}>
@@ -250,7 +242,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
           )
         )}
 
-        {/* Titular toggle — só para presentes */}
         {presente && (
           <TouchableOpacity
             onPress={() => toggleTitular(j.id_jogador)}
@@ -277,7 +268,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
         onBtnVoltar={onFechar}
       />
 
-      {/* ── Info do jogo ── */}
       <View style={styles.infoBar}>
         <Text style={styles.infoBarTimes} numberOfLines={1}>
           {partida.mandante.nome} × {partida.visitante.nome}
@@ -289,7 +279,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
         </Text>
       </View>
 
-      {/* ── Contador ── */}
       <View style={styles.contador}>
         <View style={styles.contadorItem}>
           <Text style={styles.contadorNum}>{presentes.length}</Text>
@@ -309,7 +298,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
         </View>
       </View>
 
-      {/* ── Legenda ── */}
       {!fixaCamisa && (
         <View style={styles.legenda}>
           <MaterialCommunityIcons name="information-outline" size={13} color="#666" />
@@ -324,7 +312,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
           contentContainerStyle={styles.lista}
           showsVerticalScrollIndicator={false}
         >
-          {/* Botão selecionar todos */}
           <TouchableOpacity style={styles.btnTodos} onPress={toggleTodos}>
             <MaterialCommunityIcons
               name={jogadores.every(j => estado[j.id_jogador]?.presente) ? 'checkbox-marked' : 'checkbox-blank-outline'}
@@ -352,7 +339,6 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
         </ScrollView>
       )}
 
-      {/* ── Botão confirmar ── */}
       {!carregando && (
         <View style={styles.rodape}>
           <TouchableOpacity

@@ -68,7 +68,7 @@ export default function Perfil() {
         setMembroDesde(formatted);
       }
     });
-    SecureStore.getItemAsync('userRole').then(role => setEhAdmin(role === 'ADMIN')); // ← adicionar
+    SecureStore.getItemAsync('userRole').then(role => setEhAdmin(role === 'ADMIN'));
   }, []);
 
   const fecharDadosPessoais = async () => {

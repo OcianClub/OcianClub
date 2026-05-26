@@ -1,4 +1,3 @@
-// src/services/campeonato.service.ts
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { PrismaClient } from '@prisma/client';
@@ -47,7 +46,6 @@ export interface ClassificacaoItem {
   mediaGolsSofridos: number;
   indiceTecnico: number;
   destaque: boolean;
-  // "GERAL" = ranking total cross-grupos | "GRUPO A" / "GRUPO B" etc = por grupo
   tipoTabela: string;
 }
 
@@ -63,7 +61,7 @@ function parseF(val: string | undefined): number {
 
 // ── Scraping ───────────────────────────────────────────────────────────────
 //
-// Estrutura do site (confirmada em todos os 24 HTMLs):
+// Estrutura do site:
 //
 //   td[0]  = Grupo/Chave  (ex: "CHAVE A", "GRUPO B", "GRUPO UNICO")
 //   td[1]  = Posição      (ex: "1º", "2º")
@@ -102,8 +100,6 @@ function extrairLinhas($: cheerio.CheerioAPI, tbody: cheerio.Cheerio<any>, tipoT
 
     itens.push({
       grupo:             t(0),
-      // Usa ordemHtml (posição sequencial real) em vez de t(1) que repete por grupo
-      // e pode ter critérios de desempate que só o servidor do site conhece
       posicao:           ordemHtml++,
       clube,
       pontos:            parseNum(t(3)),

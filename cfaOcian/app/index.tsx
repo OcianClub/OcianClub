@@ -1,4 +1,3 @@
-// app/index.tsx
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useRouter, useRootNavigationState } from 'expo-router';
@@ -23,7 +22,7 @@ export default function Index() {
     }
 
     checkLogin();
-  }, [rootNavigationState?.key]); // O useEffect vai rodar de novo automaticamente assim que o layout ficar pronto
+  }, [rootNavigationState?.key]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>

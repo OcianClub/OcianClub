@@ -15,7 +15,6 @@ import { CarrosselSubs, SUBS_INICIACAO, SUBS_BASE } from '@/src/components/Carro
 const NOME_CLUBE = 'OCIAN';
 const isOcian = (nome: string) => nome.toUpperCase().includes(NOME_CLUBE);
 
-// ── INTERFACES ──
 interface Time { id: number; nome: string; escudo: string | null; }
 interface Partida {
   id: number;
@@ -41,17 +40,15 @@ interface PageContentProps {
   carregando: boolean;
   proximoJogo: Partida | null;
   estatisticas: Estatisticas;
-  historico: Partida[]; // <-- NOVA PROP PARA O HISTÓRICO
+  historico: Partida[];
 }
 
-// ── FORMATADOR DE DATA ──
 const formatarDataCard = (dataStr: string) => {
   const [ano, mes, dia] = dataStr.split('T')[0].split('-');
   const d = new Date(Number(ano), Number(mes) - 1, Number(dia));
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
 };
 
-// ── COMPONENTE DA PÁGINA (CONTEÚDO DO SUB) ──
 const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageContentProps) => {
   const adversario = proximoJogo 
     ? (isOcian(proximoJogo.mandante.nome) ? proximoJogo.visitante.nome : proximoJogo.mandante.nome) 
@@ -60,7 +57,7 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
   return (
     <View style={styles.pageContainer}>
       <FlatList
-        data={historico} // <-- PASSANDO OS DADOS REAIS
+        data={historico}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.flatListContent}
         showsVerticalScrollIndicator={false}
@@ -74,7 +71,6 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
         ListHeaderComponent={() => (
           <View style={styles.headerContainer}>
 
-            {/* ── CARD: PRÓXIMO JOGO ── */}
             <View style={styles.seasonCard}>
               <Text style={styles.seasonTitle}>PRÓXIMO JOGO</Text>
               <TouchableOpacity activeOpacity={0.6}>
@@ -142,7 +138,6 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
               )}
             </View>
 
-            {/* ── CARDS DE ESTATÍSTICAS DO PLACAR ── */}
             <View style={styles.rowCards}>
               <View style={styles.smallCard}>
                 <Text style={styles.cardLabel}>PONTUAÇÃO</Text>
@@ -176,7 +171,7 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
 
           </View>
         )}
-        renderItem={({ item }) => <HistoricoPartidas partida={item} />} // <-- PASSANDO O ITEM REAL
+        renderItem={({ item }) => <HistoricoPartidas partida={item} />}
       />
     </View>
   );
@@ -185,7 +180,6 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
 export default function Home() {
   const pagerRef = useRef<PagerView>(null);
 
-  // ── ESTADOS ──
   const [faseAtiva, setFaseAtiva] = useState<'INICIACAO' | 'BASE'>('INICIACAO');
   const [subIndex, setSubIndex] = useState(0);
   
@@ -238,26 +232,22 @@ export default function Home() {
         scrollEnabled={true}
       >
         {subsAtuais.map((sub) => {
-          // 1. Filtra as partidas desse Sub que o Ocian joga
           const partidasDoSub = partidasGlobais.filter(p => 
             p.categoria?.nome.replace(' ', '-').toUpperCase() === sub.title &&
             (isOcian(p.mandante.nome) || isOcian(p.visitante.nome))
           );
 
-          // 2. Próximo Jogo (AGENDADA)
           const agendadas = partidasDoSub
             .filter(p => p.status === 'AGENDADA')
             .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
           const proximoJogo = agendadas.length > 0 ? agendadas[0] : null;
 
-          // 3. Histórico (FINALIZADA) ordenadas da mais recente para a mais antiga (Limitamos às últimas 5)
           const finalizadas = partidasDoSub
             .filter(p => p.status === 'FINALIZADA')
             .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
           
-          const historicoRecente = finalizadas.slice(0, 5); // Pega só as 5 últimas pra não travar a home
+          const historicoRecente = finalizadas.slice(0, 5);
 
-          // 4. Estatísticas
           let pontos = 0;
           let vitorias = 0;
           finalizadas.forEach(p => {

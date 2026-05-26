@@ -86,7 +86,7 @@ export const styles = StyleSheet.create({
     color: colors.text_secondary, 
     fontSize: 13, 
     letterSpacing: 0.4,
-    textAlign: 'center' // <-- Adicione isso aqui
+    textAlign: 'center'
   },  
 grupoTabTextAtivo: { color: '#fff' },
 
@@ -191,7 +191,7 @@ grupoTabTextAtivo: { color: '#fff' },
     alignItems: 'center',
   },
   tableRowOcian: {
-    backgroundColor: '#0e78ff12', // Mesclado entre 10 e 12
+    backgroundColor: '#0e78ff12',
   },
   rowBorder: {
     borderBottomWidth: 1,

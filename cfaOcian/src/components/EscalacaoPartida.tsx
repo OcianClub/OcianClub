@@ -153,7 +153,6 @@ export default function EscalacaoPartida({
     setSalvandoCamisa(true);
     try {
       await atualizarJogador(modalCamisa.id_jogador, { numCamisa: num });
-      // Atualiza local sem refetch completo
       setDisponiveis(prev =>
         prev.map(d =>
           d.id_jogador === modalCamisa.id_jogador ? { ...d, numCamisa: num } : d
@@ -241,7 +240,6 @@ export default function EscalacaoPartida({
         )}
       </View>
 
-      {/* ── Modal de edição de escalação ────────────────────────────────────── */}
       <Modal visible={modalEscalacao} transparent={false} animationType="slide" onRequestClose={() => setModalEscalacao(false)}>
         <SafeAreaView style={m.root}>
           <View style={m.header}>
@@ -273,7 +271,6 @@ export default function EscalacaoPartida({
             </View>
           ) : (
             <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
-              {/* ── TITULARES ── */}
               <View style={m.sectionHeader}>
                 <View style={[m.sectionDot, { backgroundColor: colors.primary }]} />
                 <Text style={m.sectionTitle}>EM CAMPO</Text>
@@ -314,8 +311,6 @@ export default function EscalacaoPartida({
                   </TouchableOpacity>
                 );
               })}
-
-              {/* Slots vazios */}
               {Math.min(convocados.length, MAX_TITULARES) < MAX_TITULARES &&
                 Array.from({ length: MAX_TITULARES - Math.min(convocados.length, MAX_TITULARES) }).map((_, i) => (
                   <View key={`slot-${i}`} style={m.slotVazio}>
@@ -325,7 +320,6 @@ export default function EscalacaoPartida({
                 ))
               }
 
-              {/* ── BANCO ── */}
               <View style={[m.sectionHeader, { marginTop: 20 }]}>
                 <View style={[m.sectionDot, { backgroundColor: colors.text_secondary }]} />
                 <Text style={m.sectionTitle}>BANCO</Text>
@@ -384,7 +378,6 @@ export default function EscalacaoPartida({
         </SafeAreaView>
       </Modal>
 
-      {/* ── Modal de edição de camisa (long press) ────────────────────────────── */}
       <Modal visible={!!modalCamisa} transparent animationType="fade" onRequestClose={() => setModalCamisa(null)}>
         <View style={mc.overlay}>
           <View style={mc.box}>

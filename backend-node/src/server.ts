@@ -23,16 +23,20 @@ app.use(express.json());
 app.use('/partidas/importar', importacaoRoutes);
 app.use('/campeonato', campeonatoRoutes);
 
-// Sincroniza ao subir o servidor
 sincronizarTodos().catch(console.error);
 
-// Sincroniza a cada 30 minutos
 cron.schedule('*/30 * * * *', () => {
   sincronizarTodos().catch(console.error);
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'segredo_super_seguro_ocian';
+const JWT_SECRET = process.env.JWT_SECRET;
 const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+
+if (!JWT_SECRET) {
+  console.error('ERRO FATAL: A variável JWT_SECRET não foi encontrada no arquivo .env!');
+  console.error('O servidor foi encerrado para evitar brechas de segurança na autenticação.');
+  process.exit(1);
+}
 
 // ==========================================
 // 1. AUTENTICAÇÃO
@@ -185,13 +189,13 @@ app.delete('/competicoes/:id', async (req, res) => {
 app.get('/competicoes/:id/jogadores', async (req, res) => {
   const competicao_id = Number(req.params.id);
   const categoria_id  = req.query.categoria_id ? Number(req.query.categoria_id) : undefined;
- 
+  
   try {
     const where: any = { competicao_id };
     if (categoria_id) {
       where.jogador = { categoria_id };
     }
- 
+  
     const inscricoes = await prisma.competicaoJogador.findMany({
       where,
       include: {
@@ -201,14 +205,14 @@ app.get('/competicoes/:id/jogadores', async (req, res) => {
       },
       orderBy: { jogador: { numCamisa: 'asc' } },
     });
- 
+  
     const resultado = inscricoes.map(i => ({
       id_jogador: i.jogador.id,
       nome:       i.jogador.nome,
       posicao:    i.jogador.posicao,
       numCamisa:  i.jogador.numCamisa,
     }));
- 
+  
     res.json(resultado);
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao buscar elenco da competição' });
@@ -242,7 +246,9 @@ app.get('/categorias', async (req, res) => {
   } catch (error: any) { res.status(500).json({ error: 'Erro ao buscar categorias' }); }
 });
 
-// ── JOGADORES ──
+// ==========================================
+// JOGADORES
+// ==========================================
 
 app.post('/jogadores', async (req, res) => {
   const { nome, cpf, dtNasc, posicao, numCamisa } = req.body;
@@ -274,7 +280,6 @@ app.post('/jogadores', async (req, res) => {
       if (camisaEmUso) return res.status(409).json({ error: `A camisa ${numCamisa} já está sendo usada na categoria.` });
     }
 
-    // ← include: { categoria: true } permite ao frontend detectar redirecionamento de sub
     const jogador = await prisma.jogador.create({
       data: {
         nome, cpf, dtNasc: new Date(dtNasc),
@@ -335,7 +340,6 @@ app.get('/jogadores/perfis', async (req, res) => {
   }
 });
 
-// GET /jogadores — retorna apenas ativos. Inativos ficam no banco mas somem do app.
 app.get('/jogadores', async (req, res) => {
   try {
     const jogadores = await prisma.jogador.findMany({
@@ -346,7 +350,6 @@ app.get('/jogadores', async (req, res) => {
   } catch (error: any) { res.status(500).json({ error: 'Erro ao buscar jogadores' }); }
 });
 
-// PATCH /jogadores/:id — inclui categoria na resposta para detecção de redirecionamento de sub
 app.patch('/jogadores/:id', async (req, res) => {
   const { nome, dtNasc, posicao, numCamisa } = req.body;
   try {
@@ -371,7 +374,7 @@ app.patch('/jogadores/:id', async (req, res) => {
     const jogador = await prisma.jogador.update({
       where: { id: Number(req.params.id) },
       data: dados,
-      include: { categoria: true }, // ← necessário para o frontend detectar mudança de sub
+      include: { categoria: true },
     });
     res.json(jogador);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -385,9 +388,7 @@ app.delete('/jogadores/:id', async (req, res) => {
 });
 
 // ==========================================
-// ADMIN — roda uma vez por ano (01/01)
-// Recalcula categorias e desativa quem passou dos 18.
-// Chamado pelo app via SecureStore — só executa se o ano mudou.
+// ADMIN (ATUALIZAR IDADES)
 // ==========================================
 
 app.patch('/admin/atualizar-idades', async (req, res) => {
@@ -400,7 +401,6 @@ app.patch('/admin/atualizar-idades', async (req, res) => {
       { limite: 16, nome: 'sub-16' }, { limite: 18, nome: 'sub-18' },
     ];
 
-    // Busca tudo de uma vez — evita N+1
     const [jogadores, categorias] = await Promise.all([
       prisma.jogador.findMany({ select: { id: true, dtNasc: true, categoria_id: true, ativo: true } }),
       prisma.categoria.findMany(),
@@ -413,7 +413,6 @@ app.patch('/admin/atualizar-idades', async (req, res) => {
       const catAdequada = regras.find(r => idade <= r.limite);
 
       if (!catAdequada) {
-        // Passou dos 18 — desativa sem deletar (histórico preservado)
         if (j.ativo) {
           await prisma.jogador.update({ where: { id: j.id }, data: { ativo: false } });
           desativados++;
@@ -485,7 +484,6 @@ app.get('/partidas', async (req, res) => {
     if (mes) {
       const ano    = new Date().getFullYear();
       const mesNum = Number(mes);
-      // Date.UTC lida com mes=12 corretamente (vira janeiro do ano seguinte)
       const dataInicio = new Date(Date.UTC(ano, mesNum - 1, 1));
       const dataFim    = new Date(Date.UTC(ano, mesNum, 1));
       where.data = { gte: dataInicio, lt: dataFim };
@@ -561,7 +559,6 @@ app.post('/partidas/:id/eventos', async (req, res) => {
   const partidaId = parseInt(req.params.id);
   const { jogador_id, doOcian, tipo, minuto, periodo } = req.body;
   try {
-    // data as any contorna divergência de tipo do Prisma para campos opcionais (Int?)
     const evento = await prisma.evento.create({
       data: {
         partida_id: partidaId,
@@ -573,7 +570,6 @@ app.post('/partidas/:id/eventos', async (req, res) => {
       } as any,
     });
 
-    // Busca nome do jogador separadamente (evita conflito de tipo com include)
     let nomeJogador = 'Adversário';
     if (evento.jogador_id) {
       const jog = await prisma.jogador.findUnique({
@@ -665,12 +661,10 @@ async function processarMachineLearning() {
   }
 }
 
-// ══════════════════════════════════════════════════════════
-// ROTAS DE ESCALAÇÃO — adicionar ao server.ts antes do listen
-// ══════════════════════════════════════════════════════════
+// ==========================================
+// ROTAS DE ESCALAÇÃO
+// ==========================================
 
-// GET /partidas/:id/escalacao
-// Retorna a escalação completa de uma partida com dados do jogador
 app.get('/partidas/:id/escalacao', async (req, res) => {
   const partidaId = Number(req.params.id);
   try {
@@ -689,9 +683,6 @@ app.get('/partidas/:id/escalacao', async (req, res) => {
   }
 });
 
-// PUT /partidas/:id/escalacao
-// Substitui a escalação inteira de uma partida (idempotente)
-// Body: { jogadores: [{ jogador_id, numCamisa, titular }] }
 app.put('/partidas/:id/escalacao', async (req, res) => {
   const partidaId = Number(req.params.id);
   const { jogadores } = req.body as {
@@ -703,8 +694,6 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
   }
 
   try {
-    // Delete sequencial — garante que os registros antigos são removidos
-    // antes de inserir os novos, evitando violação do @@unique([partida_id, numCamisa])
     await prisma.escalacaoPartida.deleteMany({ where: { partida_id: partidaId } });
     await prisma.escalacaoPartida.createMany({
       data: jogadores.map(j => ({
@@ -728,7 +717,6 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
   }
 });
 
-// POST /admin/reprocessar-scout — força reprocessamento do Scout IA manualmente
 app.post('/admin/reprocessar-scout', async (req, res) => {
   try {
     await processarMachineLearning();

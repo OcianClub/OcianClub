@@ -5,7 +5,6 @@ const MARGEM = 20;
 
 export const styles = StyleSheet.create({
 
-  // ── Layout base ──────────────────────────────────────────
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -16,7 +15,6 @@ export const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // ── Labels de seção ───────────────────────────────────────
   sectionLabel: {
     fontFamily: 'Creato-Bold',
     color: colors.azulClaro,
@@ -27,7 +25,6 @@ export const styles = StyleSheet.create({
     marginTop: 24,
   },
 
-  // ── Dropdown competição ───────────────────────────────────
   dropdownBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -46,7 +43,6 @@ export const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // ── Toggle Iniciação / Base ───────────────────────────────
   tipoSwitchContainer: {
     flexDirection: 'row',
     backgroundColor: '#1A1A1A',
@@ -75,7 +71,6 @@ export const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // ── Pills de categoria ────────────────────────────────────
   pillRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -104,7 +99,6 @@ export const styles = StyleSheet.create({
     color: colors.text,
   },
 
-  // ── Confronto ─────────────────────────────────────────────
   confrontoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,7 +164,10 @@ export const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // ── Mando de campo ────────────────────────────────────────
+  mandoRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   mandoBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -197,7 +194,6 @@ export const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // ── Inputs ────────────────────────────────────────────────
   rowDuplo: {
     flexDirection: 'row',
     gap: 14,
@@ -229,7 +225,6 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  // ── Escalação na Criação ──────────────────────────────────
   escalacaoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,6 +235,11 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#2a2a2a',
+  },
+  escalacaoBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   escalacaoBtnLabel: {
     fontFamily: 'Creato-Bold',
@@ -258,7 +258,6 @@ export const styles = StyleSheet.create({
     fontSize: 10,
   },
 
-  // ── Botão salvar ──────────────────────────────────────────
   salvarBtn: {
     marginTop: 32,
     borderRadius: 14,
@@ -269,6 +268,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  salvarBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   salvarText: {
     fontFamily: 'Creato-Bold',
     color: '#FFF',
@@ -276,7 +280,6 @@ export const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
 
-  // ── Modais Genéricos ───────────────────────────────────────
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',
@@ -323,12 +326,7 @@ export const styles = StyleSheet.create({
     color: colors.text,
   },
 
-  // ── MODAL ALTERAR ESCALAÇÃO (Fullscreen) ───────────────────
-  fullModal: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  fullModalHeader: {
+  escalacaoModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: MARGEM,
@@ -337,35 +335,45 @@ export const styles = StyleSheet.create({
     borderBottomColor: '#1e1e1e',
     gap: 12,
   },
-  fullModalTitle: {
+  escalacaoModalTitle: {
     fontFamily: 'Creato-Bold',
     color: colors.text,
     fontSize: 16,
     letterSpacing: 1,
     flex: 1,
   },
-  escalacaoColumns: {
-    flexDirection: 'row',
-    flex: 1,
-    gap: 0,
+  escalacaoModalSubtitle: {
+    fontFamily: 'Creato-Regular',
+    color: colors.text_secondary,
+    fontSize: 12,
   },
-  escalacaoColumn: {
-    flex: 1,
-    padding: 14,
+  escalacaoModalDica: {
+    fontFamily: 'Creato-Regular',
+    color: colors.text_secondary,
+    fontSize: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  escalacaoColumnTitle: {
+  escalacaoModalVazio: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 32,
+  },
+  escalacaoModalVazioTitulo: {
     fontFamily: 'Creato-Bold',
     color: colors.text_secondary,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 12,
+    fontSize: 14,
     textAlign: 'center',
   },
-  escalacaoColumnDivider: {
-    width: 1,
-    backgroundColor: '#1e1e1e',
+  escalacaoModalVazioSub: {
+    fontFamily: 'Creato-Regular',
+    color: '#444',
+    fontSize: 12,
+    textAlign: 'center',
   },
+
   jogadorSelectRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -394,6 +402,19 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
+  jogadorNumero: {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    backgroundColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jogadorNumeroText: {
+    fontFamily: 'Creato-Bold',
+    color: '#fff',
+    fontSize: 12,
+  },
   jogadorSelectNome: {
     fontFamily: 'Creato-Bold',
     color: colors.text,
@@ -405,6 +426,31 @@ export const styles = StyleSheet.create({
     color: colors.text_secondary,
     fontSize: 11,
   },
+  titularBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  titularBtnAtivo: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  titularBtnInativo: {
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333',
+  },
+  titularBtnText: {
+    fontFamily: 'Creato-Bold',
+    fontSize: 11,
+  },
+  titularBtnTextAtivo: {
+    color: '#fff',
+  },
+  titularBtnTextInativo: {
+    color: colors.text_secondary,
+  },
+
   applyEscalacaoBtn: {
     backgroundColor: colors.primary,
     margin: MARGEM,
@@ -412,10 +458,25 @@ export const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
   },
+  applyEscalacaoBtnDisabled: {
+    opacity: 0.5,
+  },
   applyEscalacaoBtnText: {
     fontFamily: 'Creato-Bold',
     color: '#fff',
     fontSize: 14,
     letterSpacing: 0.8,
+  },
+
+  escudoPlaceholder: {
+    backgroundColor: '#1e1e1e',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  escudoPlaceholderText: {
+    fontFamily: 'Creato-Bold',
+    color: colors.text_secondary,
   },
 });

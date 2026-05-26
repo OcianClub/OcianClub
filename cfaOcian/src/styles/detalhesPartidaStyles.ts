@@ -291,7 +291,6 @@ export const styles = StyleSheet.create({
   eventsGrid: {
     gap: 10,
   },
-  // Gol (stepper largo)
   golCard: {
     backgroundColor: colors.primary + '18',
     borderWidth: 1,
@@ -352,7 +351,6 @@ export const styles = StyleSheet.create({
     minWidth: 32,
     textAlign: 'center',
   },
-  // Grid 2x2 + 1 centralizado
   eventsRow: {
     flexDirection: 'row',
     gap: 10,

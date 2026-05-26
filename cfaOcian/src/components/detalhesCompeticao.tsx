@@ -195,7 +195,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
         </View>
       ) : (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={s.listaContent}>
-          {/* Filtros - AGORA COM O WRAPPER DE BLINDAGEM */}
       <View style={s.filtrosWrapper}>
         <ScrollView
           horizontal
@@ -282,7 +281,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
         </ScrollView>
       )}
 
-      {/* ── MODAL DETALHES ── */}
       <Modal visible={modalDetalhes} transparent animationType="slide">
         <View style={s.modalDetalhesOverlay}>
           <Pressable style={s.modalDetalhesBack} onPress={() => setModalDetalhes(false)} />
@@ -308,7 +306,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Placar */}
                   <View style={s.placarCard}>
                     <View style={s.placarGrandeRow}>
                       <Text style={[s.timeTxt, { textAlign: 'center' }]} numberOfLines={2}>
@@ -345,7 +342,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
                     </View>
                   </View>
 
-                  {/* Stats */}
                   {partidaSelecionada.status === 'FINALIZADA' && temStats && (
                     <View style={{ marginBottom: 16 }}>
                       <Text style={s.secaoLabel}>ESTATÍSTICAS DO OCIAN</Text>
@@ -371,7 +367,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
                     </View>
                   )}
 
-                  {/* Convocados */}
                   {jogadoresDaPartida.length > 0 && (
                     <View style={s.convocadosScroll}>
                       <Text style={s.secaoLabel}>CONVOCADOS ({jogadoresDaPartida.length})</Text>
@@ -389,7 +384,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
                     </View>
                   )}
 
-                  {/* Ações */}
                   <View style={s.acoesRow}>
                     <TouchableOpacity
                       style={s.btnAcao}
@@ -434,7 +428,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
         </View>
       </Modal>
 
-      {/* ── MODAL STATUS ── */}
       <Modal visible={modalStatus} transparent animationType="fade">
         <Pressable style={s.modalStatusOverlay} onPress={() => setModalStatus(false)}>
           <View style={s.modalStatusCard}>
@@ -463,7 +456,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
         </Pressable>
       </Modal>
 
-      {/* ── MODAL EDITAR ── */}
       <Modal visible={modalEditar} transparent={false} animationType="slide">
         {partidaSelecionada && (
           <OrganizarPartidaCampeonato
@@ -475,7 +467,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
         )}
       </Modal>
 
-      {/* ── MODAL PREPARAR PARTIDA ── */}
       <Modal visible={modalPreparar} transparent={false} animationType="slide">
         {partidaSelecionada && (
           <PrepararPartida
@@ -484,7 +475,7 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
             onFechar={() => setModalPreparar(false)}
             onConfirmado={() => {
               setModalPreparar(false);
-              carregar(true); // recarrega a lista para mostrar status PREPARADA
+              carregar(true);
             }}
           />
         )}

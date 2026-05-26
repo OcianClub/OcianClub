@@ -25,11 +25,6 @@ interface JogoExtraido {
 }
 
 // ─── Ordem de horário por categoria (BASE) ────────────────────────────────────
-// Federação Paulista de Futsal — jogos encavalados de hora em hora:
-// horário base   → sub-18
-// base + 1h      → sub-14
-// base + 2h      → sub-16
-// base + 3h      → sub-12
 const ORDEM_HORARIO_BASE: Record<string, number> = {
   'sub-18': 0,
   'sub-14': 1,
@@ -37,7 +32,6 @@ const ORDEM_HORARIO_BASE: Record<string, number> = {
   'sub-12': 3,
 };
 
-// Para INICIAÇÃO a ordenação natural (sub-7 → sub-10) funciona bem.
 const ORDEM_HORARIO_INICIACAO: Record<string, number> = {
   'sub-7':  0,
   'sub-8':  1,
@@ -64,7 +58,6 @@ function filtrarLinhasOcian(texto: string): string {
 }
 
 // ─── Conversor Excel → CSV ────────────────────────────────────────────────────
-
 function excelParaCSV(buffer: Buffer): string {
   const wb   = XLSX.read(buffer, { type: 'buffer', cellDates: true });
   const nome = wb.SheetNames[0];
@@ -72,13 +65,11 @@ function excelParaCSV(buffer: Buffer): string {
 }
 
 // ─── Helpers de chave para sets de deduplicação ───────────────────────────────
-
 const chaveRodada  = (catId: number, rodada: number)                      => `${catId}:r${rodada}`;
 const chaveHorario = (catId: number, data: string, horario: string)       => `${catId}:${data}:${horario}`;
 const chaveTime    = (nome: string,  catId: number)                       => `${nome.toLowerCase().trim()}:${catId}`;
 
 // ─── Exportação principal ─────────────────────────────────────────────────────
-
 export async function importarPartidas({ competicaoId, conteudo, mimeType }: ImportacaoInput) {
 
   // ── 1. Converte Excel para CSV antes de qualquer coisa ─────────────────────
@@ -155,7 +146,6 @@ export async function importarPartidas({ competicaoId, conteudo, mimeType }: Imp
   const resultado = { criados: 0, pulados: 0 };
 
   // ── 5. Chama a IA ──────────────────────────────────────────────────────────
-
     let respostaRaw: string;
   const model = genIA.getGenerativeModel({
     model: 'gemini-3.1-flash-lite',

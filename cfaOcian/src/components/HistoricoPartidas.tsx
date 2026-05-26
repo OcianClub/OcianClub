@@ -18,7 +18,6 @@ interface HistoricoPartidasProps {
 }
 
 export function HistoricoPartidas({ partida }: HistoricoPartidasProps) {
-  // Formata a data: "2026-03-25" -> "25 MAR 2026"
   const formatarData = (dataStr: string) => {
     const [ano, mes, dia] = dataStr.split('T')[0].split('-');
     const d = new Date(Number(ano), Number(mes) - 1, Number(dia));
@@ -26,7 +25,6 @@ export function HistoricoPartidas({ partida }: HistoricoPartidasProps) {
             .toUpperCase().replace(/ DE /g, ' ').replace('.', '');
   };
 
-  // Verifica quem venceu para aplicar o estilo correto (Vencedor branco, Perdedor cinza)
   const vitoriaMandante = partida.gols_mandante > partida.gols_visitante;
   const vitoriaVisitante = partida.gols_visitante > partida.gols_mandante;
   const empate = partida.gols_mandante === partida.gols_visitante;
@@ -36,7 +34,6 @@ export function HistoricoPartidas({ partida }: HistoricoPartidasProps) {
       <View style={styles.colorBorder} />
       <View style={styles.matchCard}>
         
-        {/* ── MANDANTE ── */}
         <View style={styles.timeUm}>
           <View style={styles.escudoBackground}>
             {partida.mandante.escudo ? (
@@ -53,7 +50,6 @@ export function HistoricoPartidas({ partida }: HistoricoPartidasProps) {
           </Text>
         </View>
 
-        {/* ── PLACAR E DATA ── */}
         <View style={styles.placarContainer}>
           <Text style={styles.dataJogo}>{formatarData(partida.data)}</Text>
           <View style={styles.golsWrapper}>
@@ -67,7 +63,6 @@ export function HistoricoPartidas({ partida }: HistoricoPartidasProps) {
           </View>
         </View>
 
-        {/* ── VISITANTE ── */}
         <View style={styles.timeDois}>
           <View style={styles.escudoBackground}>
             {partida.visitante.escudo ? (

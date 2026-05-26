@@ -1,4 +1,3 @@
-// src/controllers/campeonato.controller.ts
 import { Request, Response } from 'express';
 import {
   buscarClassificacao,
@@ -10,7 +9,6 @@ import {
   resolverEventoId,
 } from '../services/campeonato.service';
 
-// GET /campeonato/classificacao?temporada=2026&titulo=paulista&divisao=a3&categoria=sub12
 export async function getClassificacao(req: Request, res: Response): Promise<void> {
   const temporada = (req.query.temporada as string) ?? '2026';
   const titulo    = (req.query.titulo    as string) ?? 'paulista';
@@ -40,7 +38,6 @@ export async function getClassificacao(req: Request, res: Response): Promise<voi
   }
 }
 
-// GET /campeonato/opcoes — retorna as opções disponíveis para o frontend montar os filtros
 export async function getOpcoes(_req: Request, res: Response): Promise<void> {
   res.json({
     temporadas: TEMPORADAS,
@@ -50,8 +47,6 @@ export async function getOpcoes(_req: Request, res: Response): Promise<void> {
   });
 }
 
-// POST /campeonato/sincronizar?temporada=2026&titulo=paulista&divisao=a3&categoria=sub12
-// Rota manual para forçar sincronização de um filtro específico (uso admin)
 export async function postSincronizar(req: Request, res: Response): Promise<void> {
   const temporada = (req.query.temporada as string) ?? '2026';
   const titulo    = (req.query.titulo    as string) ?? 'paulista';

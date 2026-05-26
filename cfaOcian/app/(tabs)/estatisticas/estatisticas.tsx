@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, ActivityIndicator, TouchableOpacity,
   ScrollView, TextInput, Modal
@@ -200,8 +200,6 @@ function ModalScout({ jogador, onFechar }: { jogador: Jogador; onFechar: () => v
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scoutContent}>
-
-          {/* Identidade */}
           <View style={[styles.scoutIdentidade, { borderColor: corPerfil }]}>
             <View style={[styles.scoutAvatarNum, { backgroundColor: corPerfil + '22', borderColor: corPerfil }]}>
               <Text style={[styles.scoutAvatarNumTxt, { color: corPerfil }]}>
@@ -243,7 +241,6 @@ function ModalScout({ jogador, onFechar }: { jogador: Jogador; onFechar: () => v
                 {Object.entries(jogador.scores_ml).map(([key, val]) => (
                   <View key={key} style={styles.scoutScoreItem}>
                     <Text style={styles.scoutScoreLabel} numberOfLines={1}>
-                      {/* O Segredo de UX: Troca os underlines por espaço pra ficar bonito */}
                       {key.replace(/_/g, ' ').toUpperCase()}
                     </Text>
                     <View style={styles.scoutScoreBarBg}>
@@ -263,7 +260,6 @@ function ModalScout({ jogador, onFechar }: { jogador: Jogador; onFechar: () => v
             </View>
           )}
 
-          {/* Estatísticas com UI nova */}
           <Text style={styles.scoutSecaoLabel}>ESTATÍSTICAS</Text>
           <View style={styles.scoutStatsGrid}>
             {stats.map(s => (
@@ -275,7 +271,6 @@ function ModalScout({ jogador, onFechar }: { jogador: Jogador; onFechar: () => v
             ))}
           </View>
 
-          {/* Eficiência */}
           <Text style={styles.scoutSecaoLabel}>EFICIÊNCIA POR JOGO</Text>
           <View style={styles.scoutEficienciaRow}>
             <View style={styles.scoutEficienciaCard}>
@@ -320,16 +315,12 @@ export default function Estatisticas() {
     try {
       const todos = await obterPerfisJogadores();
       setJogadores(todos);
-
-      // Ajusta tipo e sub para o primeiro jogador encontrado
       if (todos.length > 0) {
         const primeiro = todos[0];
         if (primeiro.categoria_tipo) setTipoAtivo(primeiro.categoria_tipo);
 
-        // Acha o índice do sub no carrossel que bate com a categoria do primeiro jogador
         const subsDoTipo = primeiro.categoria_tipo === 'INICIACAO' ? SUBS_INICIACAO : SUBS_BASE;
         
-        // 2. CORREÇÃO AQUI: Usamos a função segura que previne o erro do toLowerCase()
         const idxSub = subsDoTipo.findIndex(s =>
           normalizarCategoria(s.title) === normalizarCategoria(primeiro.categoria)
         );

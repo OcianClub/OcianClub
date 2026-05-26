@@ -35,7 +35,6 @@ interface ElencoSubProps {
   onRecarregar: () => void;
 }
 
-// Payload retornado pelo onSalvo para o toast
 interface SalvoPayload {
   nome: string;
   subNome: string;
@@ -61,7 +60,6 @@ const REGRAS_SUB = [
 ];
 
 // ─── Helper: calcula sub pela data "DD/MM/AAAA" ───────────────────────────────
-
 function calcularSubPorData(dtFormatada: string): string | null {
   if (dtFormatada.length < 10) return null;
   const [d, m, a] = dtFormatada.split('/');
@@ -73,7 +71,6 @@ function calcularSubPorData(dtFormatada: string): string | null {
 }
 
 // ─── HexagonoScout ────────────────────────────────────────────────────────────
-
 function HexagonoScout({ scores, size = 200, corPerfil }: {
   scores: ScoresMl; size?: number; corPerfil: string;
 }) {
@@ -237,7 +234,7 @@ function ModalFormJogador({
   visivel,
   jogador,
   categoriaAtualId,
-  categoriaAtualNome,   // ← NOVO: nome do sub atual (ex: "sub-10")
+  categoriaAtualNome,
   onFechar,
   onSalvo,
 }: {
@@ -246,7 +243,7 @@ function ModalFormJogador({
   categoriaAtualId: number;
   categoriaAtualNome: string;
   onFechar: () => void;
-  onSalvo: (payload: SalvoPayload) => void;  // ← agora retorna dados pro toast
+  onSalvo: (payload: SalvoPayload) => void;
 }) {
   const [nome,     setNome]     = useState('');
   const [cpf,      setCpf]      = useState('');
@@ -304,7 +301,6 @@ function ModalFormJogador({
   const salvar = async () => {
     if (!nome.trim()) return Alert.alert('Atenção', 'Informe o nome do atleta.');
 
-    // Validação de CPF: obrigatório na criação, 11 dígitos
     if (!jogador) {
       const cpfLimpo = cpf.replace(/\D/g, '');
       if (!cpfLimpo) return Alert.alert('Atenção', 'CPF é obrigatório para cadastrar um atleta.');
@@ -319,7 +315,6 @@ function ModalFormJogador({
       const dtISO = dataParaISO(dtNasc);
 
       if (jogador) {
-        // ── EDIÇÃO ──
         const atualizado = await atualizarJogador(jogador.id, {
           nome,
           posicao,
@@ -333,7 +328,6 @@ function ModalFormJogador({
           foiRedirecionado: atualizado.categoria_id !== jogador.categoria_id,
         });
       } else {
-        // ── CRIAÇÃO ──
         const cpfLimpo = cpf.replace(/\D/g, '');
         const criado = await criarJogador({
           nome,
@@ -366,8 +360,6 @@ function ModalFormJogador({
               <MaterialCommunityIcons name="close" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
-
-          {/* Nome */}
           <View style={s.inputRow}>
             <MaterialCommunityIcons name="account-outline" size={18} color={colors.text_secondary} />
             <TextInput
@@ -380,7 +372,6 @@ function ModalFormJogador({
             />
           </View>
 
-          {/* CPF — só na criação */}
           {!jogador && (
             <View style={s.inputRow}>
               <MaterialCommunityIcons name="card-account-details-outline" size={18} color={colors.text_secondary} />
@@ -396,7 +387,6 @@ function ModalFormJogador({
             </View>
           )}
 
-          {/* Data de nascimento */}
           <View style={s.inputRow}>
             <MaterialCommunityIcons name="calendar-outline" size={18} color={colors.text_secondary} />
             <TextInput
@@ -409,10 +399,6 @@ function ModalFormJogador({
               maxLength={10}
             />
           </View>
-
-          {/* ── Preview do sub calculado ───────────────────────────────────
-               Aparece assim que a data tiver 10 caracteres válidos.
-               Verde = mesmo sub | Amarelo = vai para outro sub          */}
           {subCalculado && (
             <View style={[
               s.infoBox,
@@ -434,8 +420,6 @@ function ModalFormJogador({
               </Text>
             </View>
           )}
-
-          {/* Nº Camisa */}
           <View style={s.inputRow}>
             <MaterialCommunityIcons name="tshirt-crew-outline" size={18} color={colors.text_secondary} />
             <TextInput
@@ -448,8 +432,6 @@ function ModalFormJogador({
               maxLength={2}
             />
           </View>
-
-          {/* Posição */}
           <Text style={s.formLabel}>POSIÇÃO</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, marginTop: 8 }}>
             {POSICOES.map(p => (
@@ -467,8 +449,6 @@ function ModalFormJogador({
               </TouchableOpacity>
             ))}
           </View>
-
-          {/* Aviso de recálculo no modo edição */}
           {jogador && (
             <View style={s.infoBox}>
               <MaterialCommunityIcons name="information-outline" size={14} color={colors.azulClaro} />
@@ -612,7 +592,6 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
   const getScout = (id: number) => scouts.find(sc => sc.id_jogador === id) ?? null;
 
   // ── Filtros ────────────────────────────────────────────────────────────────
-  // FIX: ativosFiltrados e seniorsFiltrados estavam sendo usados sem serem definidos.
 
   const filtrar = (lista: JogadorSimples[]) =>
     lista.filter(j => {
@@ -701,7 +680,6 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         </View>
       </View>
 
-      {/* Filtros de posição + contador */}
       <View style={s.filtrosRow}>
         <View style={s.filtrosPills}>
           {(['Todos', 'Ala', 'Goleiro'] as const).map(p => (
@@ -732,7 +710,6 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         contentContainerStyle={s.lista}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {/* ── Atletas ativos ── */}
         {ativosFiltrados.length === 0 ? (
           <View style={s.emptyContainer}>
             <MaterialCommunityIcons name="account-group-outline" size={60} color="#222" />
@@ -753,7 +730,6 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
           ))
         )}
 
-        {/* ── Seção sênior (colapsável) ── */}
         {seniorsFiltrados.length > 0 && (
           <View style={{ marginTop: 24 }}>
             <TouchableOpacity
@@ -789,7 +765,6 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB */}
       <TouchableOpacity
         style={s.fab}
         onPress={() => { setJogadorEditando(null); setModalForm(true); }}
@@ -798,9 +773,6 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         <MaterialCommunityIcons name="plus" size={28} color="#FFF" />
       </TouchableOpacity>
 
-      {/* ── Toast ────────────────────────────────────────────────────────────
-           Aparece na parte de baixo da tela com feedback do cadastro.
-           Verde = mesmo sub | Amarelo = foi redirecionado             */}
       {toast && (
         <View
           pointerEvents="none"
@@ -840,7 +812,6 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         </View>
       )}
 
-      {/* Modal formulário */}
       <ModalFormJogador
         visivel={modalForm}
         jogador={jogadorEditando}
@@ -850,12 +821,10 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
         onSalvo={handleSalvo}
       />
 
-      {/* Modal scout */}
       {jogadorScout && (
         <ModalScout jogador={jogadorScout} onFechar={() => setJogadorScout(null)} />
       )}
 
-      {/* Modal confirmar exclusão */}
       <Modal visible={modalConfirmar} transparent animationType="fade">
         <Pressable style={s.overlay} onPress={() => setModalConfirmar(false)}>
           <View style={s.confirmCard}>

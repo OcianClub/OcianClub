@@ -1,6 +1,3 @@
-// cfaOcian/src/components/OrganizarPartidaCampeonato.tsx
-// MODIFICADO: loop de criação de partidas + modal de revisão com seleção por long press
-
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -25,15 +22,14 @@ interface PartidaExistente {
   mandante: Time; visitante: Time; categoria: { id: number; nome: string };
 }
 
-// Partida pendente (ainda não enviada ao servidor)
 interface PartidaPendente {
-  uid: string; // id local temporário
+  uid: string;
   mandante: Time;
   visitante: Time;
   categoria: { id: number; nome: string };
   rodada: number;
   grupo: string | null;
-  data: string;    // ISO: YYYY-MM-DD
+  data: string;
   horario: string;
   local: string;
   emCasa: boolean;
@@ -69,9 +65,6 @@ function dataParaInput(dataStr: string): string {
   return `${dia}/${mes}`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-componente: card de partida pendente no modal de revisão
-// ─────────────────────────────────────────────────────────────────────────────
 function CardPartidaPendente({
   partida,
   selecionada,
@@ -99,7 +92,6 @@ function CardPartidaPendente({
         borderColor: selecionada ? colors.primary : '#2a2a2a',
       }}
     >
-      {/* Topo: categoria + horário + grupo */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <MaterialCommunityIcons name="clock-outline" size={13} color={colors.text_secondary} />
@@ -130,7 +122,6 @@ function CardPartidaPendente({
               {partida.emCasa ? 'CASA' : 'FORA'}
             </Text>
           </View>
-          {/* Checkbox de seleção */}
           {modoSelecao && (
             <View style={{
               width: 22, height: 22, borderRadius: 6,
@@ -144,7 +135,6 @@ function CardPartidaPendente({
         </View>
       </View>
 
-      {/* Confronto */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 }}>
         <View style={{ alignItems: 'center', flex: 1, gap: 4 }}>
           <EscudoTime escudo={partida.mandante.escudo} nome={partida.mandante.nome} size={38} />
@@ -166,7 +156,6 @@ function CardPartidaPendente({
         </View>
       </View>
 
-      {/* Rodapé: data + local */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, borderTopWidth: 1, borderTopColor: '#222', paddingTop: 10, marginTop: 12 }}>
         <MaterialCommunityIcons name="calendar-outline" size={12} color="#555" />
         <Text style={{ fontFamily: 'Creato-Regular', color: '#555', fontSize: 11 }}>
@@ -177,19 +166,13 @@ function CardPartidaPendente({
     </TouchableOpacity>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Componente principal
-// ─────────────────────────────────────────────────────────────────────────────
 export default function OrganizarPartidaCampeonato({ competicao, partida, onFechar, onSalvo }: Props) {
   const modoEdicao = !!partida;
 
-  // Dados carregados
   const [times, setTimes] = useState<Time[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [carregando, setCarregando] = useState(true);
 
-  // Formulário
   const [categoriaId, setCategoriaId] = useState<number | null>(partida?.categoria.id ?? null);
   const [mandante, setMandante] = useState<Time | null>(partida?.mandante ?? null);
   const [visitante, setVisitante] = useState<Time | null>(partida?.visitante ?? null);
@@ -204,11 +187,9 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
   const [salvando, setSalvando] = useState(false);
   const ehBase = competicao.tipo === 'BASE';
 
-  // ── Fila de partidas pendentes (apenas no modo criação) ──
   const [partidasPendentes, setPartidasPendentes] = useState<PartidaPendente[]>([]);
   const [modalRevisao, setModalRevisao] = useState(false);
 
-  // ── Seleção no modal de revisão ──
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [modoSelecao, setModoSelecao] = useState(false);
 
@@ -255,11 +236,9 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
     setLocal('');
     setEmCasa(true);
     setGrupo(null);
-    // mantém categoria e rodada (incrementa rodada automaticamente)
     setRodada(r => r ? String(Number(r) + 1) : '1');
   };
 
-  // ── Salvar no modo edição (comportamento original) ──
   const salvarEdicao = async () => {
     if (!mandante || !visitante || !categoriaId || !rodada) return;
     if (data.length < 5 || horario.length < 5) return;
@@ -279,7 +258,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
     } finally { setSalvando(false); }
   };
 
-  // ── Adicionar à fila (modo criação — loop) ──
   const adicionarNaFila = () => {
     if (!mandante || !visitante || !categoriaId || !rodada) return;
     if (data.length < 5 || horario.length < 5) return;
@@ -301,7 +279,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
     resetarFormulario();
   };
 
-  // ── Enviar todas as partidas da fila ──
   const enviarTudo = async () => {
     if (partidasPendentes.length === 0) return;
     setEnviandoTudo(true);
@@ -325,7 +302,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
     } finally { setEnviandoTudo(false); }
   };
 
-  // ── Seleção no modal ──
   const toggleSelecao = (uid: string) => {
     setSelecionadas(prev => {
       const next = new Set(prev);
@@ -373,7 +349,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
         btnVoltar="arrow-left" onBtnVoltar={onFechar} semSafeArea
       />
 
-      {/* Banner edição */}
       {modoEdicao && (
         <View style={styles.editBanner}>
           <MaterialCommunityIcons name="pencil-circle" size={15} color={colors.amarelo} />
@@ -381,7 +356,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
         </View>
       )}
 
-      {/* Banner de partidas na fila (apenas modo criação) */}
       {!modoEdicao && partidasPendentes.length > 0 && (
         <TouchableOpacity
           activeOpacity={0.8}
@@ -441,7 +415,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             </ScrollView>
           )}
 
-          {/* RODADA */}
           <Text style={styles.sectionLabel}>RODADA</Text>
           <View style={styles.stepperContainer}>
             <TouchableOpacity
@@ -468,7 +441,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             </TouchableOpacity>
           </View>
 
-          {/* GRUPO */}
           {ehBase && (
             <>
               <Text style={styles.sectionLabel}>GRUPO</Text>
@@ -487,7 +459,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             </>
           )}
 
-          {/* CONFRONTO */}
           <Text style={styles.sectionLabel}>CONFRONTO</Text>
           <View style={styles.confrontoContainer}>
             {(['mandante', 'visitante'] as const).map((tipo, index) => {
@@ -525,7 +496,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             })}
           </View>
 
-          {/* MANDO DE CAMPO */}
           <Text style={styles.sectionLabel}>MANDO DE CAMPO</Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {[{ label: 'EM CASA', icon: 'home-outline', value: true }, { label: 'FORA', icon: 'bus-side', value: false }].map(opt => (
@@ -536,7 +506,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             ))}
           </View>
 
-          {/* DATA + HORÁRIO */}
           <View style={styles.rowDuplo}>
             <View style={styles.halfBlock}>
               <Text style={styles.sectionLabel}>DATA</Text>
@@ -554,14 +523,12 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             </View>
           </View>
 
-          {/* LOCAL */}
           <Text style={styles.sectionLabel}>LOCAL DA PARTIDA</Text>
           <View style={styles.inputRow}>
             <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.text_secondary} />
             <TextInput style={[styles.inputText, { flex: 1 }]} placeholder="Ginásio, quadra ou campo..." placeholderTextColor={colors.text_secondary} value={local} onChangeText={setLocal} />
           </View>
 
-          {/* Resumo pré-salvar */}
           {isValido && (
             <View style={styles.resumoCard}>
               <View style={styles.resumoRow}>
@@ -575,9 +542,7 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             </View>
           )}
 
-          {/* ── BOTÕES ── */}
           {modoEdicao ? (
-            // Modo edição: botão único de salvar (comportamento original)
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={salvarEdicao}
@@ -594,9 +559,7 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
               </LinearGradient>
             </TouchableOpacity>
           ) : (
-            // Modo criação: dois botões
             <View style={{ marginTop: isValido ? 16 : 32, gap: 10 }}>
-              {/* Adicionar mais */}
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={adicionarNaFila}
@@ -619,14 +582,11 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
                 </View>
               </TouchableOpacity>
 
-              {/* Finalizar — só aparece se tem pelo menos 1 na fila ou o form está válido */}
               {(partidasPendentes.length > 0 || isValido) && (
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => {
-                    // Se o form está válido, adiciona antes de abrir o modal
                     if (isValido) adicionarNaFila();
-                    // Pequeno delay para o estado atualizar antes de abrir modal
                     setTimeout(() => setModalRevisao(true), 50);
                   }}
                   style={[styles.salvarBtn, { marginTop: 0 }]}
@@ -648,7 +608,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
         </ScrollView>
       )}
 
-      {/* ── MODAL: SELETOR DE TIME ── */}
       <Modal visible={modalTime !== null} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => { setModalTime(null); setBuscaTime(''); }}>
           <Pressable style={[styles.modalContent, { maxHeight: '80%' }]}>
@@ -695,7 +654,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
         </Pressable>
       </Modal>
 
-      {/* ── MODAL: REVISÃO DE PARTIDAS ── */}
       <Modal
         visible={modalRevisao}
         transparent={false}
@@ -703,7 +661,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
         onRequestClose={() => { if (!enviandoTudo) { cancelarSelecao(); setModalRevisao(false); } }}
       >
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-          {/* Header do modal */}
           <View style={{
             paddingTop: 56, paddingBottom: 16,
             paddingHorizontal: 20,
@@ -711,7 +668,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             flexDirection: 'row', alignItems: 'center', gap: 12,
           }}>
             {modoSelecao ? (
-              // Barra de seleção
               <>
                 <TouchableOpacity onPress={cancelarSelecao} style={{ padding: 4 }}>
                   <MaterialCommunityIcons name="close" size={22} color={colors.text} />
@@ -733,7 +689,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
                 </TouchableOpacity>
               </>
             ) : (
-              // Header normal
               <>
                 <TouchableOpacity onPress={() => setModalRevisao(false)} style={{ padding: 4 }}>
                   <MaterialCommunityIcons name="arrow-left" size={22} color={colors.text} />
@@ -758,7 +713,6 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
             )}
           </View>
 
-          {/* Lista */}
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
@@ -780,14 +734,12 @@ export default function OrganizarPartidaCampeonato({ competicao, partida, onFech
                   onLongPress={() => ativarModoSelecao(p.uid)}
                   onPress={() => {
                     if (modoSelecao) toggleSelecao(p.uid);
-                    // fora do modo seleção: nada (ou poderia editar no futuro)
                   }}
                 />
               ))
             )}
           </ScrollView>
 
-          {/* Rodapé: botão enviar */}
           {!modoSelecao && partidasPendentes.length > 0 && (
             <View style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,

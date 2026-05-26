@@ -12,7 +12,7 @@ class JogadorStats(BaseModel):
     jogador_id: int
     GOL: int = 0
     ASSISTENCIA: int = 0
-    DEFESA: int = 0 # <--- ATUALIZADO AQUI
+    DEFESA: int = 0
     CARTAO_AMARELO: int = 0
     CARTAO_VERMELHO: int = 0
     FALTA: int = 0
@@ -39,7 +39,7 @@ def treinar_perfis(stats: List[JogadorStats]):
 
     df['gols_pj'] = df['GOL'] / jogos
     df['assis_pj'] = df['ASSISTENCIA'] / jogos
-    df['defesa_pj'] = df['DEFESA'] / jogos # <--- ATUALIZADO AQUI
+    df['defesa_pj'] = df['DEFESA'] / jogos
     df['falta_pj'] = df['FALTA'] / jogos
     df['cartao_pj'] = (df['CARTAO_AMARELO'] + 2 * df['CARTAO_VERMELHO']) / jogos
 
@@ -73,7 +73,6 @@ def treinar_perfis(stats: List[JogadorStats]):
     centroids['cluster'] = clusters
     medias = centroids.groupby('cluster').mean()
 
-    # ── Nova Lógica de Futsal ──
     # O cluster com mais defesas é inevitavelmente o dos Goleiros
     idx_paredao = medias['def'].idxmax()
     
