@@ -9,6 +9,8 @@ import axios from 'axios';
 import importacaoRoutes from './routes/importacao.routes';
 import 'dotenv/config';
 import campeonatoRoutes from './routes/campeonato.routes';
+import cron from 'node-cron';
+import { sincronizarTodos } from './services/campeonato.service';
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +22,14 @@ app.use(express.json());
 
 app.use('/partidas/importar', importacaoRoutes);
 app.use('/campeonato', campeonatoRoutes);
+
+// Sincroniza ao subir o servidor
+sincronizarTodos().catch(console.error);
+
+// Sincroniza a cada 30 minutos
+cron.schedule('*/30 * * * *', () => {
+  sincronizarTodos().catch(console.error);
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo_super_seguro_ocian';
 const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://localhost:8000';

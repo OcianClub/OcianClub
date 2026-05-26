@@ -317,6 +317,7 @@ export interface ClassificacaoItem {
   mediaGolsSofridos: number;
   indiceTecnico: number;
   destaque: boolean;
+  tipoTabela: string;
 }
  
 export interface FiltrosCampeonato {
