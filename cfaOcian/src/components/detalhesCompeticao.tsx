@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Modal,
-  Pressable, ActivityIndicator, Alert,
+  Pressable, ActivityIndicator, Alert, Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as SecureStore from 'expo-secure-store';
 import { colors } from '@/src/theme/colors';
 import { Header } from '@/src/components/Header';
 import OrganizarPartidaCampeonato from '@/src/components/organizarPartidaCampeonato';
-import { fetchPartidasPorCompeticao, fetchJogadoresPorCompeticao, atualizarStatusPartida } from '@/src/services/api';
-import PrepararPartida from '@/src/components/PrepararPartida';
+import { fetchPartidasPorCompeticao, fetchJogadoresPorCompeticao, atualizarStatusPartida, deletarPartida } from '@/src/services/api';
 import { s } from '@/src/styles/detalhesCompeticaoStyles';
 
 interface Competicao { id: number; nome: string; ano: number; tipo: 'INICIACAO' | 'BASE'; }
@@ -85,16 +86,6 @@ function formatarData(dataStr: string) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase();
 }
 
-function isHoje(dataStr: string): boolean {
-  const hoje = new Date();
-  const [ano, mes, dia] = dataStr.split('T')[0].split('-');
-  return (
-    hoje.getFullYear() === Number(ano) &&
-    hoje.getMonth() + 1 === Number(mes) &&
-    hoje.getDate() === Number(dia)
-  );
-}
-
 function calcularStatsJogadores(eventos: Evento[]) {
   const mapa: Record<number, { nome: string; stats: Record<string, number> }> = {};
   eventos.forEach(ev => {
@@ -115,8 +106,82 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
   const [modalDetalhes,      setModalDetalhes]      = useState(false);
   const [modalStatus,        setModalStatus]        = useState(false);
   const [modalEditar,        setModalEditar]        = useState(false);
-  const [modalPreparar, setModalPreparar] = useState(false);
+  const [modalNovaPartida,   setModalNovaPartida]   = useState(false);
   const [atualizandoStatus,  setAtualizandoStatus]  = useState(false);
+  const [isAdmin,            setIsAdmin]            = useState(false);
+
+  // Seleção múltipla (long press)
+  const [modoSelecao,        setModoSelecao]        = useState(false);
+  const [selecionadas,       setSelecionadas]       = useState<Set<number>>(new Set());
+  const [removendo,          setRemovendo]          = useState(false);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    SecureStore.getItemAsync('userRole').then(role => setIsAdmin(role === 'ADMIN'));
+  }, []);
+
+  const iniciarShake = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 2, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -2, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
+      ]),
+      { iterations: -1 }
+    ).start();
+  };
+
+  const pararShake = () => {
+    shakeAnim.stopAnimation();
+    shakeAnim.setValue(0);
+  };
+
+  const entrarModoSelecao = (partida: Partida) => {
+    setModoSelecao(true);
+    setSelecionadas(new Set([partida.id]));
+    iniciarShake();
+  };
+
+  const sairModoSelecao = () => {
+    setModoSelecao(false);
+    setSelecionadas(new Set());
+    pararShake();
+  };
+
+  const toggleSelecao = (id: number) => {
+    setSelecionadas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      if (next.size === 0) sairModoSelecao();
+      return next;
+    });
+  };
+
+  const removerSelecionadas = () => {
+    Alert.alert(
+      'Remover Partidas',
+      `Deseja remover ${selecionadas.size} partida${selecionadas.size > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovendo(true);
+            try {
+              await Promise.all(Array.from(selecionadas).map(id => deletarPartida(id)));
+              sairModoSelecao();
+              carregar(true);
+            } catch (e: any) {
+              Alert.alert('Erro', e.message ?? 'Não foi possível remover as partidas.');
+            } finally {
+              setRemovendo(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const carregar = useCallback(async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
@@ -219,13 +284,28 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
               <Text style={s.rodadaLabel}>{rodada.toUpperCase()}</Text>
               <View style={s.rodadaJogos}>
                 {jogos.map(partida => {
-                  const podePrepararCard = partida.status === 'AGENDADA' && isHoje(partida.data);
                   const corStatus        = STATUS_COR[partida.status] ?? colors.azulClaro;
+                  const estaSelecionada  = selecionadas.has(partida.id);
                   return (
-                    <TouchableOpacity
+                    <Animated.View
                       key={partida.id}
-                      style={[s.cardPartida, podePrepararCard && s.cardPartidaPreparar]}
-                      onPress={() => { setPartidaSelecionada(partida); setModalDetalhes(true); }}
+                      style={{ transform: [{ rotate: shakeAnim.interpolate({ inputRange: [-2, 2], outputRange: ['-2deg', '2deg'] }) }] }}
+                    >
+                    <TouchableOpacity
+                      style={[
+                        s.cardPartida,
+                        estaSelecionada && { borderWidth: 2, borderColor: colors.vermelho + 'CC', backgroundColor: colors.vermelho + '0D' },
+                      ]}
+                      onPress={() => {
+                        if (modoSelecao) { toggleSelecao(partida.id); return; }
+                        setPartidaSelecionada(partida); setModalDetalhes(true);
+                      }}
+                      onLongPress={() => {
+                        if (!isAdmin) return;
+                        if (modoSelecao) { toggleSelecao(partida.id); return; }
+                        entrarModoSelecao(partida);
+                      }}
+                      delayLongPress={400}
                       activeOpacity={0.8}
                     >
                       <View style={s.cardTopo}>
@@ -263,16 +343,13 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
                         <Text style={s.localTxt} numberOfLines={1}>{partida.local}</Text>
                       ) : null}
 
-                      {podePrepararCard && (
-                        <TouchableOpacity
-                          style={s.btnPreparar}
-                          onPress={() => { setPartidaSelecionada(partida); setModalDetalhes(true); }}
-                        >
-                          <MaterialCommunityIcons name="clipboard-list-outline" size={16} color="#a855f7" />
-                          <Text style={s.btnPrepararTxt}>PREPARAR PARTIDA</Text>
-                        </TouchableOpacity>
+                      {estaSelecionada && (
+                        <View style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.vermelho, alignItems: 'center', justifyContent: 'center' }}>
+                          <MaterialCommunityIcons name="check" size={16} color="#FFF" />
+                        </View>
                       )}
                     </TouchableOpacity>
+                    </Animated.View>
                   );
                 })}
               </View>
@@ -407,20 +484,6 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
                     </TouchableOpacity>
                   </View>
 
-                  {partidaSelecionada.status === 'AGENDADA' && isHoje(partidaSelecionada.data) && (
-                    <TouchableOpacity
-                      style={s.btnPreparaModal}
-                      onPress={() => {
-                        setModalDetalhes(false);
-                        setModalPreparar(true);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="clipboard-list-outline" size={20} color="#a855f7" />
-                      <Text style={{ color: '#a855f7', fontFamily: 'Creato-Bold', fontSize: 14 }}>
-                        PREPARAR PARTIDA
-                      </Text>
-                    </TouchableOpacity>
-                  )}
                 </>
               )}
             </ScrollView>
@@ -467,19 +530,68 @@ export default function DetalhesCompeticao({ competicao, onFechar }: Props) {
         )}
       </Modal>
 
-      <Modal visible={modalPreparar} transparent={false} animationType="slide">
-        {partidaSelecionada && (
-          <PrepararPartida
-            partida={partidaSelecionada}
-            competicao={competicao}
-            onFechar={() => setModalPreparar(false)}
-            onConfirmado={() => {
-              setModalPreparar(false);
-              carregar(true);
-            }}
-          />
-        )}
+      <Modal visible={modalNovaPartida} transparent={false} animationType="slide">
+        <OrganizarPartidaCampeonato
+          competicao={competicao}
+          onFechar={() => setModalNovaPartida(false)}
+          onSalvo={() => { setModalNovaPartida(false); carregar(true); }}
+        />
       </Modal>
+
+      {/* Barra de ação — modo seleção múltipla */}
+      {modoSelecao && (
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          flexDirection: 'row', alignItems: 'center',
+          backgroundColor: '#1a1a1a',
+          borderTopWidth: 1, borderTopColor: '#2a2a2a',
+          paddingHorizontal: 20, paddingVertical: 14,
+          paddingBottom: 28, gap: 12,
+        }}>
+          <TouchableOpacity onPress={sairModoSelecao} style={{ padding: 4 }}>
+            <MaterialCommunityIcons name="close" size={22} color={colors.text_secondary} />
+          </TouchableOpacity>
+          <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 14, flex: 1 }}>
+            {selecionadas.size} selecionada{selecionadas.size !== 1 ? 's' : ''}
+          </Text>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              backgroundColor: colors.vermelho + '22',
+              borderWidth: 1, borderColor: colors.vermelho + '55',
+              paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10,
+            }}
+            onPress={removerSelecionadas}
+            disabled={removendo}
+          >
+            {removendo
+              ? <ActivityIndicator size="small" color={colors.vermelho} />
+              : <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.vermelho} />
+            }
+            <Text style={{ fontFamily: 'Creato-Bold', color: colors.vermelho, fontSize: 13 }}>
+              Remover
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* FAB — adicionar partida */}
+      {isAdmin && !modoSelecao && (
+        <TouchableOpacity activeOpacity={0.8} style={{
+          position: 'absolute', bottom: 20, right: 20,
+          elevation: 5,
+          shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3, shadowRadius: 4,
+        }} onPress={() => setModalNovaPartida(true)}>
+          <LinearGradient
+            colors={['#0E78FF', '#2C88FE']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MaterialCommunityIcons name="plus" size={32} color="#FFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

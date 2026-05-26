@@ -1,16 +1,18 @@
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { styles } from '../../src/styles/indexStyles';
 import { Header } from '@/src/components/Header';
 import { colors } from '@/src/theme/colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import Octicons from '@expo/vector-icons/Octicons';
-import { useRef, useState, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useRef, useState, useCallback, useEffect } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
 import PagerView from 'react-native-pager-view';
 import { HistoricoPartidas } from '@/src/components/HistoricoPartidas';
 import { fetchPartidas } from '@/src/services/api';
 import { CarrosselSubs, SUBS_INICIACAO, SUBS_BASE } from '@/src/components/CarrosselSubs';
+import DetalhesPartida, { Partida as PartidaDetalhes } from '@/src/components/DetalhesPartida';
+import * as SecureStore from 'expo-secure-store';
 
 const NOME_CLUBE = 'OCIAN';
 const isOcian = (nome: string) => nome.toUpperCase().includes(NOME_CLUBE);
@@ -41,6 +43,7 @@ interface PageContentProps {
   proximoJogo: Partida | null;
   estatisticas: Estatisticas;
   historico: Partida[];
+  onVerDetalhes: (partida: Partida) => void;
 }
 
 const formatarDataCard = (dataStr: string) => {
@@ -49,7 +52,7 @@ const formatarDataCard = (dataStr: string) => {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
 };
 
-const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageContentProps) => {
+const PageContent = ({ carregando, proximoJogo, estatisticas, historico, onVerDetalhes }: PageContentProps) => {
   const adversario = proximoJogo 
     ? (isOcian(proximoJogo.mandante.nome) ? proximoJogo.visitante.nome : proximoJogo.mandante.nome) 
     : '—';
@@ -130,7 +133,7 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
                       </Text>
                     </View>
 
-                    <TouchableOpacity style={styles.btnDetalhes} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.btnDetalhes} activeOpacity={0.8} onPress={() => proximoJogo && onVerDetalhes(proximoJogo)}>
                       <Text style={styles.txtDetalhes}>VER DETALHES DA PARTIDA</Text>
                     </TouchableOpacity>
                   </View>
@@ -165,10 +168,12 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Últimas partidas</Text>
               <TouchableOpacity activeOpacity={0.6}>
-                <Text style={styles.seeAllButton}>VER TUDO</Text>
+              <Link href="/jogos/jogos">
+                <Text style={styles.seeAllButton} >VER TUDO</Text>
+              </Link>
               </TouchableOpacity>
             </View>
-
+ 
           </View>
         )}
         renderItem={({ item }) => <HistoricoPartidas partida={item} />}
@@ -180,6 +185,8 @@ const PageContent = ({ carregando, proximoJogo, estatisticas, historico }: PageC
 export default function Home() {
   const pagerRef = useRef<PagerView>(null);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [partidaSelecionada, setPartidaSelecionada] = useState<Partida | null>(null);
   const [faseAtiva, setFaseAtiva] = useState<'INICIACAO' | 'BASE'>('INICIACAO');
   const [subIndex, setSubIndex] = useState(0);
   
@@ -187,6 +194,10 @@ export default function Home() {
   const [carregando, setCarregando] = useState(true);
 
   const subsAtuais = faseAtiva === 'INICIACAO' ? SUBS_INICIACAO : SUBS_BASE;
+
+  useEffect(() => {
+    SecureStore.getItemAsync('userRole').then(role => setIsAdmin(role === 'ADMIN'));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -270,11 +281,27 @@ export default function Home() {
                 proximoJogo={proximoJogo}
                 estatisticas={{ pontos, vitorias }}
                 historico={historicoRecente}
+                onVerDetalhes={setPartidaSelecionada}
               />
             </View>
           );
         })}
       </PagerView>
+
+      {partidaSelecionada && (
+        <Modal
+          visible={!!partidaSelecionada}
+          transparent={false}
+          animationType="slide"
+          onRequestClose={() => setPartidaSelecionada(null)}
+        >
+          <DetalhesPartida
+            partida={partidaSelecionada as PartidaDetalhes}
+            isAdmin={isAdmin}
+            onBack={() => setPartidaSelecionada(null)}
+          />
+        </Modal>
+      )}
     </View>
   );
 }

@@ -95,7 +95,6 @@ model Partida {
   mandante              Time               @relation("Mandante", fields: [mandante_id], references: [id])
   visitante             Time               @relation("Visitante", fields: [visitante_id], references: [id])
 
-  @@unique([competicao_id, categoria_id, rodada])
   @@index([data])
   @@index([categoria_id])
   @@index([competicao_id])

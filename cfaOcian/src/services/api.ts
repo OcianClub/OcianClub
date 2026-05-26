@@ -91,6 +91,15 @@ export async function atualizarTime(id: number, dados: { nome: string; escudo?: 
   return res.json();
 }
 
+export async function deletarPartida(id: number) {
+  const res = await fetch(`${BASE_URL}/partidas/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const dados = await res.json().catch(() => ({}));
+    throw new Error(dados.error ?? 'Erro ao excluir partida');
+  }
+  return res.json();
+}
+
 export async function deletarTime(id: number) {
   const res = await fetch(`${BASE_URL}/times/${id}`, { method: 'DELETE' });
   if (!res.ok) {

@@ -30,7 +30,7 @@ cron.schedule('*/30 * * * *', () => {
 });
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+const PYTHON_AI_URL = process.env.PYTHON_AI_URL;
 
 if (!JWT_SECRET) {
   console.error('ERRO FATAL: A variável JWT_SECRET não foi encontrada no arquivo .env!');
@@ -439,16 +439,10 @@ app.patch('/admin/atualizar-idades', async (req, res) => {
 app.post('/partidas', async (req, res) => {
   const { mandante_id, visitante_id, data, horario, local, emCasa, categoria_id, competicao_id, rodada, grupo } = req.body;
   try {
+    console.log('BODY RECEBIDO:', JSON.stringify(req.body, null, 2));
     const dataFormatada = data ? new Date(`${data}T00:00:00Z`) : new Date();
     const catId  = Number(categoria_id);
     const compId = competicao_id ? Number(competicao_id) : null;
-
-    if (rodada && compId) {
-      const rodadaDuplicada = await prisma.partida.findFirst({
-        where: { competicao_id: compId, categoria_id: catId, rodada: Number(rodada) }
-      });
-      if (rodadaDuplicada) return res.status(400).json({ error: 'Esta categoria já tem um jogo nesta rodada.' });
-    }
 
     if (horario) {
       const choqueHorario = await prisma.partida.findFirst({
@@ -469,6 +463,7 @@ app.post('/partidas', async (req, res) => {
     });
     res.status(201).json(partida);
   } catch (error: any) {
+    console.error('ERRO AO CRIAR PARTIDA:', error);
     console.error('Erro ao criar partida:', error.message || error);
     res.status(500).json({ error: 'Erro ao criar partida' });
   }
@@ -515,6 +510,18 @@ app.patch('/partidas/:id', async (req, res) => {
     });
     res.json(partida);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/partidas/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    await prisma.evento.deleteMany({ where: { partida_id: id } });
+    await prisma.escalacaoPartida.deleteMany({ where: { partida_id: id } });
+    await prisma.partida.delete({ where: { id } });
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message ?? 'Erro ao excluir partida' });
+  }
 });
 
 app.patch('/partidas/:id/placar', async (req, res) => {

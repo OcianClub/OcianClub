@@ -642,11 +642,11 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
     carregarScouts();
     if (foiRedirecionado) {
       mostrarToast(
-        `⚠️ ${nome} foi para o ${subNome.toUpperCase()} pela data de nascimento`,
+        `${nome} foi para o ${subNome.toUpperCase()} pela data de nascimento`,
         'aviso',
       );
     } else {
-      mostrarToast(`✓ ${nome} adicionado com sucesso`, 'sucesso');
+      mostrarToast(`${nome} adicionado com sucesso`, 'sucesso');    
     }
   }, [onRecarregar, carregarScouts, mostrarToast]);
 
@@ -774,43 +774,67 @@ export default function ElencoSub({ categoria, jogadores, onFechar, onRecarregar
       </TouchableOpacity>
 
       {toast && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            bottom: 96,
-            left: 16,
-            right: 16,
-            backgroundColor: toast.tipo === 'aviso' ? '#1a1400' : '#001a0a',
-            borderWidth: 1,
-            borderColor: toast.tipo === 'aviso' ? colors.amarelo + '80' : colors.primary + '80',
-            borderRadius: 12,
-            padding: 14,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            shadowColor: '#000',
-            shadowOpacity: 0.4,
-            shadowRadius: 8,
-            elevation: 8,
-          }}
-        >
-          <MaterialCommunityIcons
-            name={toast.tipo === 'aviso' ? 'alert-circle-outline' : 'check-circle-outline'}
-            size={22}
-            color={toast.tipo === 'aviso' ? colors.amarelo : colors.primary}
-          />
-          <Text style={{
-            flex: 1,
-            color: toast.tipo === 'aviso' ? colors.amarelo : colors.primary,
-            fontSize: 13,
-            fontFamily: 'Creato-Bold',
-            lineHeight: 18,
-          }}>
-            {toast.msg}
-          </Text>
-        </View>
-      )}
+  <View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      bottom: 96,
+      left: 16,
+      right: 16,
+      borderRadius: 16,
+      elevation: 12,
+      shadowColor: '#000',
+      shadowOpacity: 0.5,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+    }}
+  >
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      backgroundColor: '#1c1c1e',
+      borderColor: toast.tipo === 'aviso' ? colors.amarelo + '90' : colors.azulClaro + '90',
+    }}>
+      <View style={{
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: toast.tipo === 'aviso' ? colors.amarelo + '18' : colors.primary + '18',
+      }}>
+        <MaterialCommunityIcons
+          name={toast.tipo === 'aviso' ? 'alert-circle-outline' : 'check-circle-outline'}
+          size={20}
+          color={toast.tipo === 'aviso' ? colors.amarelo : colors.primary}
+        />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{
+          fontFamily: 'Creato-Bold',
+          fontSize: 10,
+          letterSpacing: 1,
+          color: toast.tipo === 'aviso' ? colors.amarelo : colors.primary,
+        }}>
+          {toast.tipo === 'aviso' ? 'ATENÇÃO' : 'SUCESSO'}
+        </Text>
+        <Text style={{
+          fontFamily: 'Creato-Bold',
+          fontSize: 13,
+          color: colors.text,
+          lineHeight: 18,
+        }}>
+          {toast.msg}
+        </Text>
+      </View>
+    </View>
+  </View>
+)}
 
       <ModalFormJogador
         visivel={modalForm}
