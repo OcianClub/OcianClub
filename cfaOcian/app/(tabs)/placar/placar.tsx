@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, RefreshControl,
-  StyleSheet, TouchableOpacity,
+  TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '@/src/components/Header';
@@ -13,7 +13,8 @@ import {
   FiltrosCampeonato,
 } from '@/src/services/api';
 
-const MARGIN = 16;
+// IMPORTAÇÃO DOS ESTILOS MESCLADOS
+import { styles as s } from '@/src/styles/placarStyles';
 
 // ── Filtros estáticos ─────────────────────────────────────────────────────────
 
@@ -47,9 +48,11 @@ function tempoDesde(date: Date): string {
 }
 
 // Extrai a letra do grupo: "GRUPO C" → "C", "CHAVE A" → "A", "1ª FASE - B" → "B"
-function letraDoGrupo(grupo: string): string {
-  const m = grupo.match(/\b([A-Z])\s*$/);
-  return m ? m[1] : grupo;
+function labelDoGrupo(tipoTabela: string): string {
+  if (tipoTabela === 'GERAL') return 'Geral';
+  const m = tipoTabela.match(/\b([A-Z])\s*$/);
+  if (m) return m[1]; // "GRUPO A" → "A", "CHAVE A" → "A"
+  return tipoTabela;
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -133,7 +136,7 @@ function ClassificacaoRow({ time, isLast }: { time: ClassificacaoItem; isLast: b
         <View style={[s.clubeIcone, time.destaque && s.clubeIconeOcian]}>
           <Text style={[s.clubeIniciais, time.destaque && s.clubeIniciaisOcian]}>{iniciais}</Text>
         </View>
-        <Text style={[s.tdText, s.clubeText, time.destaque && s.ocianTextBold]} numberOfLines={1}>
+        <Text style={[s.tdText, s.clubeText, time.destaque && s.ocianTextBold]}>
           {time.clube}
         </Text>
       </View>
@@ -156,6 +159,33 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
     <TouchableOpacity style={[s.chip, active && s.chipActive]} onPress={onPress} activeOpacity={0.75}>
       <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+function OcianCardVazio() {
+  return (
+    <View style={s.ocianCard}>
+      <View style={s.ocianHeader}>
+        <View style={s.ocianIcone}>
+          <Text style={s.ocianIniciais}>OPC</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.ocianNome}>CFA OCIAN</Text>
+          <Text style={s.ocianPos}>Não participa desta categoria</Text>
+        </View>
+        <View style={s.ocianBadge}>
+          <Text style={s.ocianBadgeText}>DESTAQUE</Text>
+        </View>
+      </View>
+      <View style={s.ocianStats}>
+        {['PTS','J','GP','GC','SG'].map(label => (
+          <View key={label} style={s.ocianStatItem}>
+            <Text style={s.ocianStatValue}>—</Text>
+            <Text style={s.ocianStatLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -188,8 +218,8 @@ function Tabela({ times }: { times: ClassificacaoItem[] }) {
 
 export default function Campeonato() {
   // Filtros 1 e 2 — Divisão e Sub
-  const [divisao,   setDivisao]   = useState<Divisao>('a3');
-  const [categoria, setCategoria] = useState<Categoria>('sub12');
+const [divisao,   setDivisao]   = useState<Divisao>('a3');
+const [categoria, setCategoria] = useState<Categoria>('sub12');
 
   // Filtro 3 — Grupo (A, B, C, Geral) — populado dinamicamente pela API
   const [grupoAtivo, setGrupoAtivo] = useState<string>(GERAL);
@@ -217,12 +247,17 @@ export default function Campeonato() {
       setTabela(dados);
 
       // Extrai grupos únicos preservando ordem de chegada da API
-      const gruposUnicos = [...new Set(dados.map(t => t.grupo).filter(Boolean))];
+      const gruposUnicos = [...new Set(
+        dados
+          .filter(t => t.tipoTabela !== 'GERAL' && !t.tipoTabela.includes('UNIC'))
+          .map(t => t.tipoTabela)
+          .filter(Boolean)
+      )];
       setGrupos(gruposUnicos);
       setAtualizadoEm(new Date());
 
       // Seleciona automaticamente o grupo do Ocian; fallback: Geral
-      const grupoOcian = dados.find(t => t.destaque)?.grupo;
+      const grupoOcian = dados.find(t => t.destaque && t.tipoTabela !== 'GERAL')?.tipoTabela;
       setGrupoAtivo(grupoOcian ?? GERAL);
     } catch (e) {
         console.error('[Campeonato] Erro ao carregar:', e);
@@ -241,19 +276,19 @@ export default function Campeonato() {
   // Geral: todos os times ordenados por posição
   // Grupo específico: só os times daquele grupo
   const timesVisiveis: ClassificacaoItem[] =
-    grupoAtivo === GERAL
-      ? [...tabela].sort((a, b) => a.posicao - b.posicao)
-      : tabela.filter(t => t.grupo === grupoAtivo);
+  grupoAtivo === GERAL
+    ? tabela.filter(t => t.tipoTabela === 'GERAL')
+    : tabela.filter(t => t.tipoTabela === grupoAtivo);
 
   // Card do Ocian: busca no grupo visível; se não achar, busca em todos
-  const ocian = timesVisiveis.find(t => t.destaque) ?? tabela.find(t => t.destaque) ?? null;
+  const ocianReal = timesVisiveis.find(t => t.destaque) ?? tabela.find(t => t.destaque) ?? null;
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <View style={s.container}>
       <Header
-        title="CAMPEONATO"
+        title="PLACAR"
         icon="trophy-outline"
         showLogo={false}
         showProfile={true}
@@ -280,23 +315,23 @@ export default function Campeonato() {
       </ScrollView>
 
       {/* ── Filtro 3: Grupo (A / B / C / Geral) ─────────
-           Só aparece após carregar e se tiver mais de 1 grupo.
-           Exibe letra extraída do nome (ex: "GRUPO C" → "C").
-           "Geral" sempre aparece no fim.                      */}
+            Só aparece após carregar e se tiver mais de 1 grupo.
+            Exibe letra extraída do nome (ex: "GRUPO C" → "C").
+            "Geral" sempre aparece no fim.                     */}
       {!loading && grupos.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.grupoRow} style={s.grupoScroll}>
           {grupos.map(g => (
             <TouchableOpacity
-              key={g}
-              style={[s.grupoTab, grupoAtivo === g && s.grupoTabAtivo]}
-              onPress={() => setGrupoAtivo(g)}
-              activeOpacity={0.75}
-            >
-              <Text style={[s.grupoTabText, grupoAtivo === g && s.grupoTabTextAtivo]}>
-                {letraDoGrupo(g)}
-              </Text>
-            </TouchableOpacity>
+            key={g}
+            style={[s.grupoTab, grupoAtivo === g && s.grupoTabAtivo]}
+            onPress={() => setGrupoAtivo(g)}
+            activeOpacity={0.75}
+          >
+            <Text style={[s.grupoTabText, grupoAtivo === g && s.grupoTabTextAtivo]}>
+              {labelDoGrupo(g)}
+            </Text>
+          </TouchableOpacity>
           ))}
           <TouchableOpacity
             style={[s.grupoTab, grupoAtivo === GERAL && s.grupoTabAtivo]}
@@ -333,7 +368,7 @@ export default function Campeonato() {
                 ))}
               </View>
             </View>
-            <View style={[s.tableContainer, { marginHorizontal: MARGIN }]}>
+            <View style={s.tableContainer}>
               {[0,1,2,3,4].map(i => <SkeletonRow key={i} />)}
             </View>
           </>
@@ -351,11 +386,14 @@ export default function Campeonato() {
           </View>
         ) : (
           <>
-            {/* Card do Ocian — visível em qualquer aba */}
-            {ocian && <OcianCard time={ocian} />}
+            {ocianReal ? (
+                <OcianCard time={ocianReal} />
+              ) : (
+                <OcianCardVazio />
+              )}
 
             {/* Tabela única do grupo/geral selecionado */}
-            <Tabela times={timesVisiveis.filter(t => !t.destaque)} />
+            <Tabela times={timesVisiveis} />
 
             <View style={{ height: 8 }} />
           </>
@@ -366,116 +404,3 @@ export default function Campeonato() {
     </View>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content:   { paddingTop: 8, paddingBottom: 40 },
-
-  atualizadoText: {
-    fontFamily: 'Creato-Regular', color: colors.text_secondary,
-    fontSize: 11, textAlign: 'center', marginBottom: 12, letterSpacing: 0.5,
-  },
-
-  // ── Banner ──────────────────────────────────────────────
-  banner: {
-    flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: MARGIN, marginTop: 12, marginBottom: 12,
-    backgroundColor: '#141414', borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: '#2a2a2a', gap: 12,
-  },
-  bannerIconWrap: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#0e78ff18', justifyContent: 'center', alignItems: 'center',
-  },
-  bannerCampeonato: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 15, letterSpacing: 1 },
-  bannerSub: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 11, marginTop: 2, letterSpacing: 0.4 },
-
-  // ── Filtros 1 e 2 (Divisão / Sub) ──────────────────────
-  chipScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
-  chipRow: { paddingHorizontal: MARGIN, paddingVertical: 4, gap: 8, flexDirection: 'row', alignItems: 'center' },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#2a2a2a',
-  },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 12, letterSpacing: 0.4 },
-  chipTextActive: { color: '#fff' },
-
-  // ── Filtro 3 (Grupo: A / B / C / Geral) ────────────────
-  grupoScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 12 },
-  grupoRow: { paddingHorizontal: MARGIN, gap: 6, flexDirection: 'row', alignItems: 'center' },
-  grupoTab: {
-    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
-    backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#2a2a2a',
-    minWidth: 52, alignItems: 'center',
-  },
-  grupoTabAtivo: { backgroundColor: colors.primary, borderColor: colors.primary },
-  grupoTabText: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 13, letterSpacing: 0.4 },
-  grupoTabTextAtivo: { color: '#fff' },
-
-  // ── Card Ocian ──────────────────────────────────────────
-  ocianCard: {
-    marginHorizontal: MARGIN, backgroundColor: '#0e78ff0f', borderRadius: 16,
-    borderWidth: 1, borderColor: '#0e78ff44', padding: 18, marginBottom: 16, marginTop: 4,
-  },
-  ocianHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  ocianIcone: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#0e78ff33', justifyContent: 'center', alignItems: 'center',
-  },
-  ocianIniciais: { fontFamily: 'Creato-Bold', color: colors.azulClaro, fontSize: 11, letterSpacing: 0.5 },
-  ocianNome: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 15 },
-  ocianPos:  { fontFamily: 'Creato-Regular', color: colors.azulClaro, fontSize: 12, marginTop: 2 },
-  ocianBadge: {
-    backgroundColor: '#0e78ff22', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4,
-    borderWidth: 1, borderColor: '#0e78ff44',
-  },
-  ocianBadgeText: { fontFamily: 'Creato-Bold', color: colors.azulClaro, fontSize: 9, letterSpacing: 1.2 },
-  ocianStats: { flexDirection: 'row', gap: 6 },
-  ocianStatItem: { flex: 1, backgroundColor: '#0e78ff18', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  ocianStatValue: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 15 },
-  ocianStatLabel: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 9, letterSpacing: 1, marginTop: 2 },
-
-  // ── Tabela ──────────────────────────────────────────────
-  tableContainer: {
-    marginHorizontal: MARGIN, backgroundColor: '#1A1A1A', borderRadius: 16,
-    overflow: 'hidden', borderWidth: 1, borderColor: '#2a2a2a',
-  },
-  tableHeader: {
-    flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 14,
-    backgroundColor: '#111111', alignItems: 'center',
-  },
-  thText: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
-  colPosHeader:  { width: 36, paddingLeft: 4 },
-  colStatHeader: { width: 28, textAlign: 'center' },
-  tableRow: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 14, alignItems: 'center' },
-  tableRowOcian: { backgroundColor: '#0e78ff10' },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#252525' },
-  ocianBorda: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors.primary ?? '#0e78ff', borderRadius: 2 },
-
-  // ── Células ─────────────────────────────────────────────
-  tdText:      { fontFamily: 'Creato-Regular', color: colors.text, fontSize: 13 },
-  colPosText:  { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 13, width: 36, paddingLeft: 4 },
-  colStat:     { width: 28, textAlign: 'center' },
-  colDestaque: { fontFamily: 'Creato-Bold', fontSize: 13 },
-  ocianColor:  { color: colors.azulClaro },
-
-  // ── Clube ───────────────────────────────────────────────
-  clubeContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  clubeIcone: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' },
-  clubeIconeOcian: { backgroundColor: '#0e78ff22' },
-  clubeIniciais: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 9 },
-  clubeIniciaisOcian: { color: colors.azulClaro },
-  clubeText: { fontFamily: 'Creato-Regular', color: colors.text, fontSize: 13, flexShrink: 1 },
-  ocianTextBold: { fontFamily: 'Creato-Bold', color: colors.text },
-
-  // ── Empty / Erro ────────────────────────────────────────
-  emptyState: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyTitle: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 16, marginBottom: 8, textAlign: 'center' },
-  emptyText: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, textAlign: 'center', lineHeight: 20 },
-
-  // ── Skeleton ────────────────────────────────────────────
-  skeleton: { height: 14, borderRadius: 6, backgroundColor: '#2a2a2a' },
-});

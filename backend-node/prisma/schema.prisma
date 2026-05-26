@@ -157,6 +157,7 @@ model CampeonatoClassificacao {
   divisao           String
   categoria         String
   eventoId          Int
+  tipoTabela        String   // "GERAL" | "GRUPO A" | "GRUPO B" | "CHAVE A" etc.
   grupo             String
   posicao           Int
   clube             String
@@ -175,7 +176,7 @@ model CampeonatoClassificacao {
   destaque          Boolean  @default(false)
   atualizadoEm      DateTime @default(now())
 
-  @@index([temporada, titulo, divisao, categoria])
+  @@index([temporada, titulo, divisao, categoria, tipoTabela])
 }
 
 enum Role {
