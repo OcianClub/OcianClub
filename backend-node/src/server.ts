@@ -651,7 +651,9 @@ async function processarMachineLearning() {
   }
 
   try {
-    const resposta = await axios.post(`${PYTHON_AI_URL}/internal/ml/treinar-perfis`, payload);
+    const resposta = await axios.post(`${PYTHON_AI_URL}/internal/ml/treinar-perfis`, payload, {
+     timeout: 120000,
+    });
     for (const resultado of resposta.data) {
       await prisma.jogador.update({
         where: { id: resultado.jogador_id },
