@@ -156,9 +156,13 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
       try {
         const jogadoresDaComp = await fetchJogadoresPorCompeticao(comp.id);
         const mapa: Record<number, number[]> = {};
-        jogadoresDaComp.forEach((j: { id: number; categoria_id: number }) => {
-          if (!mapa[j.categoria_id]) mapa[j.categoria_id] = [];
-          mapa[j.categoria_id].push(j.id);
+        jogadoresDaComp.forEach((j: any) => {
+          // API retorna id_jogador; categoria_id vem do cadastro do jogador local
+          const jogId  = j.id_jogador ?? j.id;
+          const catId  = j.categoria_id ?? jogadores.find(jl => jl.id === jogId)?.categoria_id;
+          if (!jogId || !catId) return;
+          if (!mapa[catId]) mapa[catId] = [];
+          if (!mapa[catId].includes(jogId)) mapa[catId].push(jogId);
         });
         setElencoSelecionado(mapa);
       } catch { setElencoSelecionado({}); }
@@ -191,16 +195,6 @@ export default function Equipes({ onFechar, noModal }: EquipesProps) {
 
   // Salva o elenco no banco e avança para a tabela de jogos
   const avancarParaJogos = async () => {
-    // Valida que pelo menos 1 jogador foi selecionado em cada categoria do tipo do campeonato
-    const categoriasDoTipo = categorias.filter(c => getTipoCategoria(c.nome) === tipoForm);
-    const vazias = categoriasDoTipo.filter(c => !elencoSelecionado[c.id]?.length);
-    if (vazias.length > 0) {
-      return Alert.alert(
-        'Elenco incompleto',
-        `Selecione pelo menos 1 atleta em:\n${vazias.map(c => c.nome).join(', ')}`
-      );
-    }
-
     setSalvando(true);
     try {
       if (itemSelecionado && 'ano' in itemSelecionado) {
@@ -637,17 +631,17 @@ const importarArquivo = async (tipo: 'documento' | 'imagem') => {
                     return (
                       <TouchableOpacity key={cat.id} style={styles.cardCategoriaOcian} onPress={() => abrirSelecaoElenco(cat)}>
                         <View style={[styles.iconCircleOcian, {
-                          backgroundColor: vazio ? colors.vermelho + '15' : colors.primary + '22',
+                          backgroundColor: vazio ? '#1e1e1e' : colors.primary + '22',
                         }]}>
                           <MaterialCommunityIcons
-                            name={vazio ? 'alert-outline' : 'check-all'}
+                            name={vazio ? 'account-plus-outline' : 'check-all'}
                             size={28}
-                            color={vazio ? colors.vermelho : colors.primary}
+                            color={vazio ? colors.text_secondary : colors.primary}
                           />
                         </View>
                         <Text style={styles.catOcianNome}>{cat.nome}</Text>
-                        <Text style={[styles.catOcianBadgeTxt, { color: vazio ? colors.vermelho : colors.primary }]}>
-                          {vazio ? 'Obrigatório' : `${totalSelecionados} selecionados`}
+                        <Text style={[styles.catOcianBadgeTxt, { color: vazio ? colors.text_secondary : colors.primary }]}>
+                          {vazio ? 'Nenhum selecionado' : `${totalSelecionados} selecionados`}
                         </Text>
                       </TouchableOpacity>
                     );

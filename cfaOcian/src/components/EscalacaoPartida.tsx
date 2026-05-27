@@ -104,6 +104,13 @@ export default function EscalacaoPartida({
   const [novaCamisa,        setNovaCamisa]        = useState('');
   const [salvandoCamisa,    setSalvandoCamisa]    = useState(false);
 
+  // ── Confirmação de troca de camisa ────────────────────────────────────────
+  const [modalTroca, setModalTroca] = useState<{
+    nomeA: string; camisaA: string | number | null;
+    nomeB: string; camisaB: string | number | null;
+    onConfirmar: () => void;
+  } | null>(null);
+
   const emCampo  = escalacao.filter(e => e.titular);
   const reservas = escalacao.filter(e => !e.titular);
 
@@ -210,35 +217,28 @@ export default function EscalacaoPartida({
 
     if (conflito) {
       const camisaAtual = modalCamisa.numCamisa ?? null;
-      Alert.alert(
-        `Camisa #${num} já em uso`,
-        `${conflito.nome} já usa essa camisa.\n\nDeseja trocar? ${conflito.nome} vai receber a camisa ${camisaAtual ?? 'nenhuma'} de ${modalCamisa.nome}.`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Confirmar troca',
-            onPress: async () => {
-              setSalvandoCamisa(true);
-              try {
-                // Salva nova camisa do jogador atual no banco
-                await atualizarJogador(Number(modalCamisa.id_jogador), { numCamisa: num });
-                // Se o jogador atual tinha uma camisa antes, passa ela pro conflito
-                if (camisaAtual && camisaAtual > 0) {
-                  await atualizarJogador(Number(conflito.id_jogador), { numCamisa: camisaAtual });
-                }
-                setDisponiveis(prev => prev.map(d => {
-                  if (Number(d.id_jogador) === Number(modalCamisa.id_jogador)) return { ...d, numCamisa: num };
-                  if (Number(d.id_jogador) === Number(conflito.id_jogador))    return { ...d, numCamisa: camisaAtual ?? null };
-                  return d;
-                }));
-                setModalCamisa(null);
-              } catch (e: any) {
-                Alert.alert('Erro', e.message || 'Não foi possível salvar.');
-              } finally { setSalvandoCamisa(false); }
-            },
-          },
-        ],
-      );
+      setModalTroca({
+        nomeA: modalCamisa.nome, camisaA: num,
+        nomeB: conflito.nome,    camisaB: camisaAtual,
+        onConfirmar: async () => {
+          setModalTroca(null);
+          setSalvandoCamisa(true);
+          try {
+            await atualizarJogador(Number(modalCamisa.id_jogador), { numCamisa: num });
+            if (camisaAtual && camisaAtual > 0) {
+              await atualizarJogador(Number(conflito.id_jogador), { numCamisa: camisaAtual });
+            }
+            setDisponiveis(prev => prev.map(d => {
+              if (Number(d.id_jogador) === Number(modalCamisa.id_jogador)) return { ...d, numCamisa: num };
+              if (Number(d.id_jogador) === Number(conflito.id_jogador))    return { ...d, numCamisa: camisaAtual ?? null };
+              return d;
+            }));
+            setModalCamisa(null);
+          } catch (e: any) {
+            Alert.alert('Erro', e.message || 'Não foi possível salvar.');
+          } finally { setSalvandoCamisa(false); }
+        },
+      });
       return;
     }
 
@@ -627,39 +627,67 @@ export default function EscalacaoPartida({
       <Modal visible={!!modalCamisa} transparent animationType="fade" onRequestClose={() => setModalCamisa(null)}>
         <View style={mc.overlay}>
           <View style={mc.box}>
-            <View style={mc.iconWrap}>
-              <MaterialCommunityIcons name="tshirt-crew" size={28} color={colors.primary} />
-            </View>
             <Text style={mc.titulo}>Número de Camisa</Text>
-            <Text style={mc.sub} numberOfLines={1}>{modalCamisa?.nome}</Text>
-
-            <View style={mc.inputWrap}>
-              <Text style={mc.hash}>#</Text>
-              <TextInput
-                style={mc.input}
-                placeholder="00"
-                placeholderTextColor="#333"
-                value={novaCamisa}
-                onChangeText={v => setNovaCamisa(v.replace(/\D/g, ''))}
-                keyboardType="numeric"
-                maxLength={2}
-                autoFocus
-              />
-            </View>
-
+            <Text style={mc.sub}>{modalCamisa?.nome}</Text>
+            <TextInput
+              style={mc.input}
+              placeholder="Ex: 10"
+              placeholderTextColor="#444"
+              value={novaCamisa}
+              onChangeText={v => setNovaCamisa(v.replace(/\D/g, ''))}
+              keyboardType="numeric"
+              maxLength={2}
+              autoFocus
+            />
             <View style={mc.btnRow}>
               <TouchableOpacity style={mc.btnCancel} onPress={() => setModalCamisa(null)}>
                 <Text style={mc.btnCancelTxt}>CANCELAR</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[mc.btnSave, (!novaCamisa || salvandoCamisa) && { opacity: 0.4 }]}
+                style={[mc.btnSave, salvandoCamisa && { opacity: 0.6 }]}
                 onPress={salvarCamisa}
-                disabled={!novaCamisa || salvandoCamisa}
+                disabled={salvandoCamisa}
               >
                 {salvandoCamisa
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={mc.btnSaveTxt}>SALVAR</Text>
                 }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* ── Modal de troca de camisa ──────────────────────────────────────── */}
+      <Modal visible={!!modalTroca} transparent animationType="fade" onRequestClose={() => setModalTroca(null)}>
+        <View style={mt.overlay}>
+          <View style={mt.box}>
+            <View style={mt.iconWrap}>
+              <MaterialCommunityIcons name="tshirt-crew" size={26} color={colors.amarelo} />
+            </View>
+            <Text style={mt.titulo}>Camisa #{modalTroca?.camisaA} em uso</Text>
+            <Text style={mt.desc}>
+              <Text style={mt.bold}>{modalTroca?.nomeB}</Text> já usa essa camisa.{'\n'}Deseja fazer a troca?
+            </Text>
+            <View style={mt.trocaRow}>
+              <View style={mt.card}>
+                <View style={mt.badge}><Text style={mt.badgeNum}>#{modalTroca?.camisaA}</Text></View>
+                <Text style={mt.cardNome} numberOfLines={1}>{modalTroca?.nomeA}</Text>
+              </View>
+              <MaterialCommunityIcons name="swap-horizontal" size={24} color={colors.primary} />
+              <View style={mt.card}>
+                <View style={[mt.badge, { backgroundColor: '#252525' }]}>
+                  <Text style={[mt.badgeNum, { color: colors.text_secondary }]}>#{modalTroca?.camisaB || '—'}</Text>
+                </View>
+                <Text style={mt.cardNome} numberOfLines={1}>{modalTroca?.nomeB}</Text>
+              </View>
+            </View>
+            <View style={mt.btnRow}>
+              <TouchableOpacity style={mt.btnCancel} onPress={() => setModalTroca(null)}>
+                <Text style={mt.btnCancelTxt}>CANCELAR</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={mt.btnConfirm} onPress={modalTroca?.onConfirmar}>
+                <MaterialCommunityIcons name="check" size={15} color="#fff" />
+                <Text style={mt.btnConfirmTxt}>TROCAR</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -723,42 +751,38 @@ const m = {
 
 // ── Estilos do modal de camisa ────────────────────────────────────────────────
 const mc = {
-  overlay: {
-    flex: 1, backgroundColor: '#000000cc',
-    alignItems: 'center' as const, justifyContent: 'center' as const, padding: 32,
-  },
-  box: {
-    backgroundColor: '#161616', borderRadius: 20, padding: 28,
-    width: '100%' as const, borderWidth: 1, borderColor: '#2a2a2a',
-    alignItems: 'center' as const,
-  },
-  iconWrap: {
-    width: 56, height: 56, borderRadius: 16,
-    backgroundColor: colors.primary + '18',
-    alignItems: 'center' as const, justifyContent: 'center' as const,
-    marginBottom: 14,
-  },
-  titulo: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 17, marginBottom: 4 },
-  sub: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, marginBottom: 24 },
-  inputWrap: {
-    flexDirection: 'row' as const, alignItems: 'center' as const,
-    backgroundColor: '#111', borderRadius: 14, borderWidth: 1, borderColor: '#2a2a2a',
-    paddingHorizontal: 20, marginBottom: 24, width: '100%' as const,
-  },
-  hash: { fontFamily: 'Creato-Bold', color: colors.primary, fontSize: 32, marginRight: 4 },
+  overlay: { flex: 1, backgroundColor: '#000000aa', alignItems: 'center' as const, justifyContent: 'center' as const, padding: 32 },
+  box: { backgroundColor: '#1a1a1a', borderRadius: 16, padding: 24, width: '100%' as const, borderWidth: 1, borderColor: '#2a2a2a' },
+  titulo: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 16, marginBottom: 4 },
+  sub: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, marginBottom: 16 },
   input: {
-    flex: 1, color: colors.text, fontFamily: 'Creato-Bold', fontSize: 40,
-    paddingVertical: 14, textAlign: 'center' as const,
+    backgroundColor: '#111', borderRadius: 10, borderWidth: 1, borderColor: '#333',
+    color: colors.text, fontFamily: 'Creato-Bold', fontSize: 24,
+    paddingVertical: 12, paddingHorizontal: 16, textAlign: 'center' as const, marginBottom: 20,
   },
-  btnRow: { flexDirection: 'row' as const, gap: 10, width: '100%' as const },
-  btnCancel: {
-    flex: 1, paddingVertical: 13, borderRadius: 12,
-    borderWidth: 1, borderColor: '#2a2a2a', alignItems: 'center' as const,
-  },
+  btnRow: { flexDirection: 'row' as const, gap: 10 },
+  btnCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#333', alignItems: 'center' as const },
   btnCancelTxt: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 13 },
-  btnSave: {
-    flex: 1, paddingVertical: 13, borderRadius: 12,
-    backgroundColor: colors.primary, alignItems: 'center' as const,
-  },
-  btnSaveTxt: { fontFamily: 'Creato-Bold', color: '#FFF', fontSize: 13, letterSpacing: 0.5 },
+  btnSave: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center' as const },
+  btnSaveTxt: { fontFamily: 'Creato-Bold', color: '#FFF', fontSize: 13 },
+};
+
+// ── Estilos do modal de troca de camisa ──────────────────────────────────────
+const mt = {
+  overlay: { flex: 1, backgroundColor: '#000000cc', alignItems: 'center' as const, justifyContent: 'center' as const, padding: 28 },
+  box: { backgroundColor: '#161616', borderRadius: 20, padding: 24, width: '100%' as const, borderWidth: 1, borderColor: '#2a2a2a', alignItems: 'center' as const },
+  iconWrap: { width: 52, height: 52, borderRadius: 14, backgroundColor: colors.amarelo + '18', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 14 },
+  titulo: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 16, marginBottom: 8, textAlign: 'center' as const },
+  desc: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, textAlign: 'center' as const, lineHeight: 20, marginBottom: 24 },
+  bold: { fontFamily: 'Creato-Bold', color: colors.text },
+  trocaRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, marginBottom: 28, width: '100%' as const },
+  card: { flex: 1, alignItems: 'center' as const, gap: 8, backgroundColor: '#1e1e1e', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#2a2a2a' },
+  badge: { backgroundColor: colors.primary + '20', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
+  badgeNum: { fontFamily: 'Creato-Bold', color: colors.primary, fontSize: 20 },
+  cardNome: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 12, textAlign: 'center' as const },
+  btnRow: { flexDirection: 'row' as const, gap: 10, width: '100%' as const },
+  btnCancel: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: '#2a2a2a', alignItems: 'center' as const },
+  btnCancelTxt: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 13 },
+  btnConfirm: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center' as const, flexDirection: 'row' as const, justifyContent: 'center' as const, gap: 6 },
+  btnConfirmTxt: { fontFamily: 'Creato-Bold', color: '#FFF', fontSize: 13, letterSpacing: 0.5 },
 };
