@@ -30,7 +30,7 @@ cron.schedule('*/30 * * * *', () => {
 });
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+const PYTHON_AI_URL = process.env.PYTHON_AI_URL;
 
 if (!JWT_SECRET) {
   console.error('ERRO FATAL: A variável JWT_SECRET não foi encontrada no arquivo .env!');
@@ -644,7 +644,9 @@ async function processarMachineLearning() {
   }
 
   try {
-    const resposta = await axios.post(`${PYTHON_AI_URL}/internal/ml/treinar-perfis`, payload);
+    const resposta = await axios.post(`${PYTHON_AI_URL}/internal/ml/treinar-perfis`, payload, {
+     timeout: 120000,
+    });
     for (const resultado of resposta.data) {
       await prisma.jogador.update({
         where: { id: resultado.jogador_id },
