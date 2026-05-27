@@ -34,8 +34,11 @@ const PYTHON_AI_URL = process.env.PYTHON_AI_URL;
 
 if (!JWT_SECRET) {
   console.error('ERRO FATAL: A variável JWT_SECRET não foi encontrada no arquivo .env!');
-  console.error('O servidor foi encerrado para evitar brechas de segurança na autenticação.');
   process.exit(1);
+}
+
+if (!PYTHON_AI_URL) {
+  console.warn('⚠️  PYTHON_AI_URL não definida — Scout IA desativado.');
 }
 
 // ==========================================
@@ -189,31 +192,22 @@ app.delete('/competicoes/:id', async (req, res) => {
 app.get('/competicoes/:id/jogadores', async (req, res) => {
   const competicao_id = Number(req.params.id);
   const categoria_id  = req.query.categoria_id ? Number(req.query.categoria_id) : undefined;
-  
   try {
     const where: any = { competicao_id };
-    if (categoria_id) {
-      where.jogador = { categoria_id };
-    }
-  
+    if (categoria_id) where.jogador = { categoria_id };
     const inscricoes = await prisma.competicaoJogador.findMany({
       where,
       include: {
-        jogador: {
-          select: { id: true, nome: true, posicao: true, numCamisa: true, categoria_id: true },
-        },
+        jogador: { select: { id: true, nome: true, posicao: true, numCamisa: true, categoria_id: true } },
       },
       orderBy: { jogador: { numCamisa: 'asc' } },
     });
-  
-    const resultado = inscricoes.map(i => ({
+    res.json(inscricoes.map(i => ({
       id_jogador: i.jogador.id,
       nome:       i.jogador.nome,
       posicao:    i.jogador.posicao,
       numCamisa:  i.jogador.numCamisa,
-    }));
-  
-    res.json(resultado);
+    })));
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao buscar elenco da competição' });
   }
@@ -388,7 +382,7 @@ app.delete('/jogadores/:id', async (req, res) => {
 });
 
 // ==========================================
-// ADMIN (ATUALIZAR IDADES)
+// ADMIN
 // ==========================================
 
 app.patch('/admin/atualizar-idades', async (req, res) => {
@@ -400,23 +394,16 @@ app.patch('/admin/atualizar-idades', async (req, res) => {
       { limite: 12, nome: 'sub-12' }, { limite: 14, nome: 'sub-14' },
       { limite: 16, nome: 'sub-16' }, { limite: 18, nome: 'sub-18' },
     ];
-
     const [jogadores, categorias] = await Promise.all([
       prisma.jogador.findMany({ select: { id: true, dtNasc: true, categoria_id: true, ativo: true } }),
       prisma.categoria.findMany(),
     ]);
-
     let atualizados = 0, desativados = 0;
-
     for (const j of jogadores) {
       const idade = anoAtual - new Date(j.dtNasc).getFullYear();
       const catAdequada = regras.find(r => idade <= r.limite);
-
       if (!catAdequada) {
-        if (j.ativo) {
-          await prisma.jogador.update({ where: { id: j.id }, data: { ativo: false } });
-          desativados++;
-        }
+        if (j.ativo) { await prisma.jogador.update({ where: { id: j.id }, data: { ativo: false } }); desativados++; }
       } else {
         const cat = categorias.find(c => c.nome.toLowerCase() === catAdequada.nome.toLowerCase());
         if (cat && (cat.id !== j.categoria_id || !j.ativo)) {
@@ -425,11 +412,8 @@ app.patch('/admin/atualizar-idades', async (req, res) => {
         }
       }
     }
-
     res.json({ ok: true, atualizados, desativados, total: jogadores.length });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // ==========================================
@@ -442,13 +426,6 @@ app.post('/partidas', async (req, res) => {
     const dataFormatada = data ? new Date(`${data}T00:00:00Z`) : new Date();
     const catId  = Number(categoria_id);
     const compId = competicao_id ? Number(competicao_id) : null;
-
-    if (rodada && compId) {
-      const rodadaDuplicada = await prisma.partida.findFirst({
-        where: { competicao_id: compId, categoria_id: catId, rodada: Number(rodada) }
-      });
-      if (rodadaDuplicada) return res.status(400).json({ error: 'Esta categoria já tem um jogo nesta rodada.' });
-    }
 
     if (horario) {
       const choqueHorario = await prisma.partida.findFirst({
@@ -517,6 +494,18 @@ app.patch('/partidas/:id', async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+app.delete('/partidas/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    await prisma.evento.deleteMany({ where: { partida_id: id } });
+    await prisma.escalacaoPartida.deleteMany({ where: { partida_id: id } });
+    await prisma.partida.delete({ where: { id } });
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message ?? 'Erro ao excluir partida' });
+  }
+});
+
 app.patch('/partidas/:id/placar', async (req, res) => {
   const { gols_mandante, gols_visitante } = req.body;
   try {
@@ -534,8 +523,11 @@ app.patch('/partidas/:id/status', async (req, res) => {
   const { status } = req.body;
   try {
     const partida = await prisma.partida.update({ where: { id: partidaId }, data: { status } });
+    // ✅ CORRIGIDO: dispara em background sem bloquear a resposta
     if (status === 'FINALIZADA') {
-      processarMachineLearning().catch(err => console.error('Erro na IA:', err));
+      setImmediate(() => {
+        processarMachineLearning().catch(err => console.error('Erro na IA:', err));
+      });
     }
     res.json(partida);
   } catch (error: any) { res.status(500).json({ error: 'Erro ao atualizar status' }); }
@@ -613,6 +605,11 @@ app.delete('/eventos/:id', async (req, res) => {
 // ==========================================
 
 async function processarMachineLearning() {
+  if (!PYTHON_AI_URL) {
+    console.warn('Scout IA: PYTHON_AI_URL não definida, pulando processamento.');
+    return;
+  }
+
   const jogadores = await prisma.jogador.findMany({
     include: { eventos: true, escalacoes: true }
   });
@@ -626,13 +623,13 @@ async function processarMachineLearning() {
       const jogos = j.escalacoes ? j.escalacoes.length : 0;
       if (jogos === 0) return null;
       return {
-        jogador_id:      j.id,
-        GOL:             stats['GOL']             || 0,
-        ASSISTENCIA:     stats['ASSISTENCIA']     || 0,
-        DEFESA:          stats['DEFESA']          || 0,
-        CARTAO_AMARELO:  stats['CARTAO_AMARELO']  || 0,
-        CARTAO_VERMELHO: stats['CARTAO_VERMELHO'] || 0,
-        FALTA:           stats['FALTA']           || 0,
+        jogador_id:       j.id,
+        GOL:              stats['GOL']             || 0,
+        ASSISTENCIA:      stats['ASSISTENCIA']     || 0,
+        DEFESA:           stats['DEFESA']          || 0,
+        CARTAO_AMARELO:   stats['CARTAO_AMARELO']  || 0,
+        CARTAO_VERMELHO:  stats['CARTAO_VERMELHO'] || 0,
+        FALTA:            stats['FALTA']           || 0,
         jogos_disputados: jogos,
       };
     })
@@ -644,9 +641,13 @@ async function processarMachineLearning() {
   }
 
   try {
-    const resposta = await axios.post(`${PYTHON_AI_URL}/internal/ml/treinar-perfis`, payload, {
-     timeout: 120000,
-    });
+    console.log(`Scout IA: Enviando ${payload.length} jogadores para o Python...`);
+    // ✅ CORRIGIDO: timeout de 2 minutos para o Render acordar do modo sleep
+    const resposta = await axios.post(
+      `${PYTHON_AI_URL}/internal/ml/treinar-perfis`,
+      payload,
+      { timeout: 120000 }
+    );
     for (const resultado of resposta.data) {
       await prisma.jogador.update({
         where: { id: resultado.jogador_id },
@@ -657,7 +658,7 @@ async function processarMachineLearning() {
         },
       });
     }
-    console.log(`Scout IA: ${resposta.data.length} jogadores processados e atualizados.`);
+    console.log(`Scout IA: ${resposta.data.length} jogadores processados e atualizados. ✅`);
   } catch (error: any) {
     console.error('Falha ao comunicar com microsserviço de IA Python:', error.message || error);
   }
@@ -673,9 +674,7 @@ app.get('/partidas/:id/escalacao', async (req, res) => {
     const escalacao = await prisma.escalacaoPartida.findMany({
       where: { partida_id: partidaId },
       include: {
-        jogador: {
-          select: { nome: true, posicao: true, numCamisa: true },
-        },
+        jogador: { select: { nome: true, posicao: true, numCamisa: true } },
       },
       orderBy: [{ titular: 'desc' }, { numCamisa: 'asc' }],
     });
@@ -690,28 +689,24 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
   const { jogadores } = req.body as {
     jogadores: { jogador_id: number; numCamisa: number; titular: boolean }[];
   };
-
   if (!Array.isArray(jogadores)) {
     return res.status(400).json({ error: 'jogadores deve ser um array' });
   }
-
   try {
     await prisma.escalacaoPartida.deleteMany({ where: { partida_id: partidaId } });
     await prisma.escalacaoPartida.createMany({
       data: jogadores.map(j => ({
         partida_id: partidaId,
         jogador_id: Number(j.jogador_id),
-        numCamisa: Number(j.numCamisa),
-        titular: Boolean(j.titular),
+        numCamisa:  Number(j.numCamisa),
+        titular:    Boolean(j.titular),
       })),
     });
-
     const nova = await prisma.escalacaoPartida.findMany({
       where: { partida_id: partidaId },
       include: { jogador: { select: { nome: true, posicao: true, numCamisa: true } } },
       orderBy: [{ titular: 'desc' }, { numCamisa: 'asc' }],
     });
-
     res.json(nova);
   } catch (error: any) {
     console.error('Erro ao salvar escalação:', error.message);
@@ -720,12 +715,11 @@ app.put('/partidas/:id/escalacao', async (req, res) => {
 });
 
 app.post('/admin/reprocessar-scout', async (req, res) => {
-  try {
-    await processarMachineLearning();
-    res.json({ ok: true, mensagem: 'Scout IA reprocessado com sucesso.' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Erro ao reprocessar scout.' });
+  if (!PYTHON_AI_URL) {
+    return res.status(503).json({ error: 'PYTHON_AI_URL não configurada no servidor.' });
   }
+  res.json({ ok: true, mensagem: 'Scout IA iniciado em background. Aguarde ~60s e consulte /jogadores/perfis.' });
+  processarMachineLearning().catch(err => console.error('Erro no reprocessamento manual:', err));
 });
 
 const PORT = process.env.PORT || 3000;
