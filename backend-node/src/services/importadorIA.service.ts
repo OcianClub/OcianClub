@@ -148,7 +148,7 @@ export async function importarPartidas({ competicaoId, conteudo, mimeType }: Imp
   // ── 5. Chama a IA ──────────────────────────────────────────────────────────
     let respostaRaw: string;
   const model = genIA.getGenerativeModel({
-    model: 'gemini-3.1-flash-lite',
+    model: 'gemini-3.5-flash',
     generationConfig: {
       // @ts-ignore
       thinkingConfig: { thinkingBudget: 0 }

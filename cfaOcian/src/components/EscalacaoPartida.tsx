@@ -31,10 +31,11 @@ export interface JogadorDisponivel {
 }
 
 interface EscalacaoPartidaProps {
-  partidaId:     number;
-  categoriaId:   number | null;
-  competicaoId?: number | null;
-  isAdmin:       boolean;
+  partidaId:      number;
+  categoriaId:    number | null;
+  competicaoId?:  number | null;
+  isAdmin:        boolean;
+  partidaStatus?: 'AGENDADA' | 'AO_VIVO' | 'FINALIZADA';
   onEscalacaoAtualizada?: (escalacao: JogadorEscalado[]) => void;
 }
 
@@ -81,14 +82,22 @@ const jr = {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function EscalacaoPartida({
-  partidaId, categoriaId, competicaoId, isAdmin, onEscalacaoAtualizada,
+  partidaId, categoriaId, competicaoId, isAdmin, partidaStatus, onEscalacaoAtualizada,
 }: EscalacaoPartidaProps) {
+  const modoSubstituicao = partidaStatus === 'AO_VIVO';
+  const MAX_SUBS = 3;
+
   const [escalacao,         setEscalacao]         = useState<JogadorEscalado[]>([]);
   const [disponiveis,       setDisponiveis]       = useState<JogadorDisponivel[]>([]);
   const [carregando,        setCarregando]        = useState(false);
   const [modalEscalacao,    setModalEscalacao]    = useState(false);
   const [convocados,        setConvocados]        = useState<number[]>([]);
   const [salvandoEscalacao, setSalvandoEscalacao] = useState(false);
+
+  // Substituição AO_VIVO
+  const [subStep,   setSubStep]   = useState<'saindo' | 'entrando'>('saindo');
+  const [subSaindo, setSubSaindo] = useState<number | null>(null);
+  const [subPares,  setSubPares]  = useState<{ saindo: number; entrando: number }[]>([]);
 
   // ── Edição de camisa ──────────────────────────────────────────────────────
   const [modalCamisa,       setModalCamisa]       = useState<JogadorDisponivel | null>(null);
@@ -124,25 +133,66 @@ export default function EscalacaoPartida({
   }, [carregarEscalacao, carregarDisponiveis]);
 
   const abrirModal = () => {
-    const tits = escalacao.filter(e => e.titular).map(e => e.jogador_id);
-    const bnco = escalacao.filter(e => !e.titular).map(e => e.jogador_id);
-    setConvocados([...tits, ...bnco]);
+    if (modoSubstituicao) {
+      setSubStep('saindo');
+      setSubSaindo(null);
+      setSubPares([]);
+    } else {
+      const tits = escalacao.filter(e => e.titular).map(e => e.jogador_id);
+      const bnco = escalacao.filter(e => !e.titular).map(e => e.jogador_id);
+      setConvocados([...tits, ...bnco]);
+    }
     setModalEscalacao(true);
   };
 
   const toggleConvocado = (id: number) => {
-    setConvocados(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    // Removendo
+    if (convocados.includes(id)) {
+      setConvocados(prev => prev.filter(i => i !== id));
+      return;
+    }
+    // Adicionando — checar camisa duplicada
+    const jogadorNovo = disponiveis.find(d => Number(d.id_jogador) === id);
+    const camisaNova  = jogadorNovo?.numCamisa;
+    if (camisaNova && camisaNova > 0) {
+      const duplicado = disponiveis.find(d =>
+        Number(d.id_jogador) !== id &&
+        d.numCamisa === camisaNova &&
+        convocados.includes(Number(d.id_jogador))
+      );
+      if (duplicado) {
+        Alert.alert(
+          `Camisa #${camisaNova} em uso`,
+          `${duplicado.nome} já usa a camisa ${camisaNova}.\n\nDeseja remover a camisa de ${duplicado.nome} e convocar ${jogadorNovo?.nome} com ela?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Confirmar troca',
+              onPress: () => {
+                setDisponiveis(prev =>
+                  prev.map(d =>
+                    d.id_jogador === duplicado.id_jogador ? { ...d, numCamisa: null } : d
+                  )
+                );
+                setConvocados(prev => [...prev, id]);
+              },
+            },
+          ]
+        );
+        return;
+      }
+    }
+    setConvocados(prev => [...prev, id]);
   };
 
-  // ── Abre modal de edição de camisa ────────────────────────────────────────
+  // ── Abre modal de edição de camisa (bloqueado durante jogo ao vivo) ────────
   const abrirEdicaoCamisa = (jogador: JogadorDisponivel) => {
+    if (modoSubstituicao) return;
     setModalCamisa(jogador);
     setNovaCamisa(jogador.numCamisa ? String(jogador.numCamisa) : '');
   };
 
-  // ── Salva nova camisa no cadastro do jogador ──────────────────────────────
+  // ── Salva nova camisa — com detecção de conflito entre convocados ─────────
   const salvarCamisa = async () => {
     if (!modalCamisa) return;
     const num = Number(novaCamisa.trim());
@@ -150,12 +200,54 @@ export default function EscalacaoPartida({
       Alert.alert('Atenção', 'Digite um número de camisa válido.');
       return;
     }
+
+    // Verifica se outro jogador JÁ CONVOCADO tem essa camisa
+    const conflito = disponiveis.find(d =>
+      Number(d.id_jogador) !== Number(modalCamisa.id_jogador) &&
+      d.numCamisa === num &&
+      convocados.includes(Number(d.id_jogador))
+    );
+
+    if (conflito) {
+      const camisaAtual = modalCamisa.numCamisa ?? null;
+      Alert.alert(
+        `Camisa #${num} já em uso`,
+        `${conflito.nome} já usa essa camisa.\n\nDeseja trocar? ${conflito.nome} vai receber a camisa ${camisaAtual ?? 'nenhuma'} de ${modalCamisa.nome}.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Confirmar troca',
+            onPress: async () => {
+              setSalvandoCamisa(true);
+              try {
+                // Salva nova camisa do jogador atual no banco
+                await atualizarJogador(Number(modalCamisa.id_jogador), { numCamisa: num });
+                // Se o jogador atual tinha uma camisa antes, passa ela pro conflito
+                if (camisaAtual && camisaAtual > 0) {
+                  await atualizarJogador(Number(conflito.id_jogador), { numCamisa: camisaAtual });
+                }
+                setDisponiveis(prev => prev.map(d => {
+                  if (Number(d.id_jogador) === Number(modalCamisa.id_jogador)) return { ...d, numCamisa: num };
+                  if (Number(d.id_jogador) === Number(conflito.id_jogador))    return { ...d, numCamisa: camisaAtual ?? null };
+                  return d;
+                }));
+                setModalCamisa(null);
+              } catch (e: any) {
+                Alert.alert('Erro', e.message || 'Não foi possível salvar.');
+              } finally { setSalvandoCamisa(false); }
+            },
+          },
+        ],
+      );
+      return;
+    }
+
     setSalvandoCamisa(true);
     try {
-      await atualizarJogador(modalCamisa.id_jogador, { numCamisa: num });
+      await atualizarJogador(Number(modalCamisa.id_jogador), { numCamisa: num });
       setDisponiveis(prev =>
         prev.map(d =>
-          d.id_jogador === modalCamisa.id_jogador ? { ...d, numCamisa: num } : d
+          Number(d.id_jogador) === Number(modalCamisa.id_jogador) ? { ...d, numCamisa: num } : d
         )
       );
       setModalCamisa(null);
@@ -165,6 +257,34 @@ export default function EscalacaoPartida({
   };
 
   const confirmarEscalacao = async () => {
+    // ── MODO SUBSTITUIÇÃO (AO_VIVO) ──────────────────────────────────────────
+    if (modoSubstituicao) {
+      if (subPares.length === 0) {
+        Alert.alert('Atenção', 'Defina ao menos uma substituição.');
+        return;
+      }
+      setSalvandoEscalacao(true);
+      try {
+        const novaEsc = escalacao.map(e => {
+          const saiu   = subPares.find(s => s.saindo   === e.jogador_id);
+          const entrou = subPares.find(s => s.entrando === e.jogador_id);
+          if (saiu)   return { ...e, titular: false };
+          if (entrou) return { ...e, titular: true };
+          return e;
+        });
+        await salvarEscalacaoPartida(
+          partidaId,
+          novaEsc.map(e => ({ jogador_id: e.jogador_id, numCamisa: e.numCamisa, titular: e.titular }))
+        );
+        await carregarEscalacao();
+        setModalEscalacao(false);
+      } catch (e: any) {
+        Alert.alert('Erro', e.message || 'Não foi possível salvar.');
+      } finally { setSalvandoEscalacao(false); }
+      return;
+    }
+
+    // ── MODO NORMAL (pré-jogo) ────────────────────────────────────────────────
     if (convocados.length === 0) {
       Alert.alert('Atenção', 'Convoque ao menos um jogador.');
       return;
@@ -205,7 +325,7 @@ export default function EscalacaoPartida({
           </View>
           {isAdmin && (
             <TouchableOpacity onPress={abrirModal}>
-              <Text style={sv.action}>ALTERAR</Text>
+              <Text style={sv.action}>{modoSubstituicao ? 'SUBSTITUIÇÃO' : 'ALTERAR'}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -246,22 +366,142 @@ export default function EscalacaoPartida({
             <TouchableOpacity onPress={() => setModalEscalacao(false)}>
               <MaterialCommunityIcons name="close" size={22} color={colors.text} />
             </TouchableOpacity>
-            <Text style={m.title}>ESCALAÇÃO</Text>
-            <View style={m.counter}>
-              <Text style={m.counterNum}>{Math.min(convocados.length, MAX_TITULARES)}</Text>
-              <Text style={m.counterSep}>/</Text>
-              <Text style={m.counterMax}>{MAX_TITULARES}</Text>
-            </View>
+            <Text style={m.title}>{modoSubstituicao ? 'SUBSTITUIÇÃO' : 'ESCALAÇÃO'}</Text>
+            {modoSubstituicao ? (
+              <View style={m.counter}>
+                <Text style={m.counterNum}>{subPares.length}</Text>
+                <Text style={m.counterSep}>/</Text>
+                <Text style={m.counterMax}>{MAX_SUBS}</Text>
+              </View>
+            ) : (
+              <View style={m.counter}>
+                <Text style={m.counterNum}>{Math.min(convocados.length, MAX_TITULARES)}</Text>
+                <Text style={m.counterSep}>/</Text>
+                <Text style={m.counterMax}>{MAX_TITULARES}</Text>
+              </View>
+            )}
           </View>
 
           <View style={m.dica}>
             <MaterialCommunityIcons name="information-outline" size={14} color={colors.text_secondary} />
             <Text style={m.dicaTxt}>
-              Toque para convocar · Segure para editar camisa · Primeiros {MAX_TITULARES} = titulares
+              {modoSubstituicao
+                ? `Escolha quem SAI, depois quem ENTRA · máx. ${MAX_SUBS} trocas por partida`
+                : `Toque para convocar · Segure para editar camisa · Primeiros ${MAX_TITULARES} = titulares`
+              }
             </Text>
           </View>
 
-          {disponiveis.length === 0 ? (
+          {modoSubstituicao ? (
+            /* ══ MODO SUBSTITUIÇÃO ══════════════════════════════════════════════ */
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
+
+              {/* Pares já definidos */}
+              {subPares.length > 0 && (
+                <View style={{ marginBottom: 16, gap: 6 }}>
+                  <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 11, letterSpacing: 1, marginBottom: 4 }}>SUBSTITUIÇÕES DEFINIDAS</Text>
+                  {subPares.map((par, i) => {
+                    const saindo   = escalacao.find(e => e.jogador_id === par.saindo);
+                    const entrando = escalacao.find(e => e.jogador_id === par.entrando);
+                    return (
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary + '10', borderRadius: 10, padding: 10, gap: 8, borderWidth: 1, borderColor: colors.primary + '30' }}>
+                        <View style={m.camisa}><Text style={[m.camisaNum, { color: colors.vermelho }]}>{saindo?.numCamisa}</Text></View>
+                        <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 12, flex: 1 }} numberOfLines={1}>{saindo?.jogador.nome}</Text>
+                        <MaterialCommunityIcons name="arrow-right" size={16} color={colors.primary} />
+                        <View style={m.camisa}><Text style={[m.camisaNum, { color: colors.primary }]}>{entrando?.numCamisa}</Text></View>
+                        <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 12, flex: 1 }} numberOfLines={1}>{entrando?.jogador.nome}</Text>
+                        <TouchableOpacity onPress={() => setSubPares(p => p.filter((_, j) => j !== i))}>
+                          <MaterialCommunityIcons name="close-circle" size={18} color={colors.vermelho + '88'} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {subPares.length < MAX_SUBS && (
+                <>
+                  {/* Indicador de passo */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14, backgroundColor: '#1a1a1a', borderRadius: 12, padding: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: subStep === 'saindo' ? colors.vermelho : colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                      <MaterialCommunityIcons name={subStep === 'saindo' ? 'arrow-up-circle' : 'arrow-down-circle'} size={18} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: 'Creato-Bold', color: colors.text, fontSize: 14 }}>
+                        {subStep === 'saindo' ? 'Quem SAI do campo?' : 'Quem ENTRA em campo?'}
+                      </Text>
+                      <Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 11 }}>
+                        {subStep === 'saindo'
+                          ? 'Toque no titular que vai ao banco'
+                          : `Substituindo: ${escalacao.find(e => e.jogador_id === subSaindo)?.jogador.nome ?? ''}`
+                        }
+                      </Text>
+                    </View>
+                    {subStep === 'entrando' && (
+                      <TouchableOpacity onPress={() => { setSubStep('saindo'); setSubSaindo(null); }}>
+                        <Text style={{ fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 12 }}>← VOLTAR</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {subStep === 'saindo' ? (
+                    // Lista de TITULARES disponíveis para sair
+                    escalacao
+                      .filter(e => e.titular && !subPares.find(s => s.saindo === e.jogador_id))
+                      .map(item => (
+                        <TouchableOpacity
+                          key={item.jogador_id}
+                          style={[m.cardTitular, { marginBottom: 8 }]}
+                          onPress={() => { setSubSaindo(item.jogador_id); setSubStep('entrando'); }}
+                          activeOpacity={0.8}
+                        >
+                          <View style={m.camisa}><Text style={m.camisaNum}>{item.numCamisa}</Text></View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={m.nome}>{item.jogador.nome}</Text>
+                            <Text style={m.pos}>{item.jogador.posicao}</Text>
+                          </View>
+                          <View style={m.tagTitular}><Text style={m.tagTitularTxt}>EM CAMPO</Text></View>
+                          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.vermelho} />
+                        </TouchableOpacity>
+                      ))
+                  ) : (
+                    // Lista de RESERVAS disponíveis para entrar
+                    escalacao
+                      .filter(e => !e.titular && !subPares.find(s => s.entrando === e.jogador_id))
+                      .map(item => (
+                        <TouchableOpacity
+                          key={item.jogador_id}
+                          style={[m.cardBanco, m.cardBancoConvocado, { marginBottom: 8 }]}
+                          onPress={() => {
+                            setSubPares(p => [...p, { saindo: subSaindo!, entrando: item.jogador_id }]);
+                            setSubStep('saindo');
+                            setSubSaindo(null);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <View style={[m.camisa, { backgroundColor: colors.text_secondary + '33' }]}>
+                            <Text style={m.camisaNum}>{item.numCamisa}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={m.nome}>{item.jogador.nome}</Text>
+                            <Text style={m.pos}>{item.jogador.posicao}</Text>
+                          </View>
+                          <View style={m.tagBanco}><Text style={m.tagBancoTxt}>BANCO</Text></View>
+                          <MaterialCommunityIcons name="arrow-up-circle-outline" size={20} color={colors.primary} />
+                        </TouchableOpacity>
+                      ))
+                  )}
+
+                  {subPares.length > 0 && (
+                    <Text style={{ fontFamily: 'Creato-Regular', color: '#555', fontSize: 11, textAlign: 'center', marginTop: 8 }}>
+                      {MAX_SUBS - subPares.length} troca(s) restante(s)
+                    </Text>
+                  )}
+                </>
+              )}
+            </ScrollView>
+          ) : disponiveis.length === 0 ? (
+            /* ══ MODO NORMAL — sem jogadores ════════════════════════════════════ */
             <View style={m.empty}>
               <MaterialCommunityIcons name="account-group-outline" size={48} color="#333" />
               <Text style={m.emptyTxt}>Nenhum jogador encontrado</Text>
@@ -270,6 +510,7 @@ export default function EscalacaoPartida({
               </Text>
             </View>
           ) : (
+            /* ══ MODO NORMAL — lista de convocação ══════════════════════════════ */
             <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
               <View style={m.sectionHeader}>
                 <View style={[m.sectionDot, { backgroundColor: colors.primary }]} />
@@ -366,13 +607,18 @@ export default function EscalacaoPartida({
           )}
 
           <TouchableOpacity
-            style={[m.salvarBtn, (salvandoEscalacao || disponiveis.length === 0) && { opacity: 0.5 }]}
+            style={[m.salvarBtn, (salvandoEscalacao || (modoSubstituicao ? subPares.length === 0 : disponiveis.length === 0)) && { opacity: 0.5 }]}
             onPress={confirmarEscalacao}
-            disabled={salvandoEscalacao || disponiveis.length === 0}
+            disabled={salvandoEscalacao || (modoSubstituicao ? subPares.length === 0 : disponiveis.length === 0)}
           >
             {salvandoEscalacao
               ? <ActivityIndicator color="#fff" />
-              : <Text style={m.salvarBtnTxt}>SALVAR · {convocados.length} CONVOCADO{convocados.length !== 1 ? 'S' : ''}</Text>
+              : <Text style={m.salvarBtnTxt}>
+                  {modoSubstituicao
+                    ? `CONFIRMAR ${subPares.length} SUBSTITUIÇÃO(ÕES)`
+                    : `SALVAR · ${convocados.length} CONVOCADO${convocados.length !== 1 ? 'S' : ''}`
+                  }
+                </Text>
             }
           </TouchableOpacity>
         </SafeAreaView>
@@ -381,26 +627,34 @@ export default function EscalacaoPartida({
       <Modal visible={!!modalCamisa} transparent animationType="fade" onRequestClose={() => setModalCamisa(null)}>
         <View style={mc.overlay}>
           <View style={mc.box}>
+            <View style={mc.iconWrap}>
+              <MaterialCommunityIcons name="tshirt-crew" size={28} color={colors.primary} />
+            </View>
             <Text style={mc.titulo}>Número de Camisa</Text>
-            <Text style={mc.sub}>{modalCamisa?.nome}</Text>
-            <TextInput
-              style={mc.input}
-              placeholder="Ex: 10"
-              placeholderTextColor="#444"
-              value={novaCamisa}
-              onChangeText={v => setNovaCamisa(v.replace(/\D/g, ''))}
-              keyboardType="numeric"
-              maxLength={2}
-              autoFocus
-            />
+            <Text style={mc.sub} numberOfLines={1}>{modalCamisa?.nome}</Text>
+
+            <View style={mc.inputWrap}>
+              <Text style={mc.hash}>#</Text>
+              <TextInput
+                style={mc.input}
+                placeholder="00"
+                placeholderTextColor="#333"
+                value={novaCamisa}
+                onChangeText={v => setNovaCamisa(v.replace(/\D/g, ''))}
+                keyboardType="numeric"
+                maxLength={2}
+                autoFocus
+              />
+            </View>
+
             <View style={mc.btnRow}>
               <TouchableOpacity style={mc.btnCancel} onPress={() => setModalCamisa(null)}>
                 <Text style={mc.btnCancelTxt}>CANCELAR</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[mc.btnSave, salvandoCamisa && { opacity: 0.6 }]}
+                style={[mc.btnSave, (!novaCamisa || salvandoCamisa) && { opacity: 0.4 }]}
                 onPress={salvarCamisa}
-                disabled={salvandoCamisa}
+                disabled={!novaCamisa || salvandoCamisa}
               >
                 {salvandoCamisa
                   ? <ActivityIndicator color="#fff" size="small" />
@@ -469,18 +723,42 @@ const m = {
 
 // ── Estilos do modal de camisa ────────────────────────────────────────────────
 const mc = {
-  overlay: { flex: 1, backgroundColor: '#000000aa', alignItems: 'center' as const, justifyContent: 'center' as const, padding: 32 },
-  box: { backgroundColor: '#1a1a1a', borderRadius: 16, padding: 24, width: '100%' as const, borderWidth: 1, borderColor: '#2a2a2a' },
-  titulo: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 16, marginBottom: 4 },
-  sub: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, marginBottom: 16 },
-  input: {
-    backgroundColor: '#111', borderRadius: 10, borderWidth: 1, borderColor: '#333',
-    color: colors.text, fontFamily: 'Creato-Bold', fontSize: 24,
-    paddingVertical: 12, paddingHorizontal: 16, textAlign: 'center' as const, marginBottom: 20,
+  overlay: {
+    flex: 1, backgroundColor: '#000000cc',
+    alignItems: 'center' as const, justifyContent: 'center' as const, padding: 32,
   },
-  btnRow: { flexDirection: 'row' as const, gap: 10 },
-  btnCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#333', alignItems: 'center' as const },
+  box: {
+    backgroundColor: '#161616', borderRadius: 20, padding: 28,
+    width: '100%' as const, borderWidth: 1, borderColor: '#2a2a2a',
+    alignItems: 'center' as const,
+  },
+  iconWrap: {
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: colors.primary + '18',
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+    marginBottom: 14,
+  },
+  titulo: { fontFamily: 'Creato-Bold', color: colors.text, fontSize: 17, marginBottom: 4 },
+  sub: { fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 13, marginBottom: 24 },
+  inputWrap: {
+    flexDirection: 'row' as const, alignItems: 'center' as const,
+    backgroundColor: '#111', borderRadius: 14, borderWidth: 1, borderColor: '#2a2a2a',
+    paddingHorizontal: 20, marginBottom: 24, width: '100%' as const,
+  },
+  hash: { fontFamily: 'Creato-Bold', color: colors.primary, fontSize: 32, marginRight: 4 },
+  input: {
+    flex: 1, color: colors.text, fontFamily: 'Creato-Bold', fontSize: 40,
+    paddingVertical: 14, textAlign: 'center' as const,
+  },
+  btnRow: { flexDirection: 'row' as const, gap: 10, width: '100%' as const },
+  btnCancel: {
+    flex: 1, paddingVertical: 13, borderRadius: 12,
+    borderWidth: 1, borderColor: '#2a2a2a', alignItems: 'center' as const,
+  },
   btnCancelTxt: { fontFamily: 'Creato-Bold', color: colors.text_secondary, fontSize: 13 },
-  btnSave: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center' as const },
-  btnSaveTxt: { fontFamily: 'Creato-Bold', color: '#FFF', fontSize: 13 },
+  btnSave: {
+    flex: 1, paddingVertical: 13, borderRadius: 12,
+    backgroundColor: colors.primary, alignItems: 'center' as const,
+  },
+  btnSaveTxt: { fontFamily: 'Creato-Bold', color: '#FFF', fontSize: 13, letterSpacing: 0.5 },
 };

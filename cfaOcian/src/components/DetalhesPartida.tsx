@@ -814,7 +814,7 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
                 {evento.periodo && (
                   <Text style={{ fontFamily: 'Creato-Regular', color: colors.text_secondary, fontSize: 11 }}>{evento.periodo}º T</Text>
                 )}
-                {isAdmin && (
+                {isInterativo && (
                   deletandoEvento === evento.id
                     ? <ActivityIndicator size="small" color={colors.vermelho} />
                     : <TouchableOpacity onPress={() => handleDeletarEvento(evento)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -868,6 +868,7 @@ export default function DetalhesPartida({ partida: partidaInicial, isAdmin, onBa
           categoriaId={partida.categoria?.id ?? null}
           competicaoId={partida.competicao_id ?? partida.competicao?.id ?? null}
           isAdmin={isAdmin}
+          partidaStatus={partida.status}
           onEscalacaoAtualizada={setEscalacao}
         />
 

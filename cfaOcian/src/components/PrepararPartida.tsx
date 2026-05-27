@@ -130,8 +130,49 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
     });
   };
 
+  // Atualiza o valor enquanto digita — sem checar conflito ainda
   const setCamisa = (id: number, valor: string) => {
-    setEstado(prev => ({ ...prev, [id]: { ...prev[id], camisa: valor } }));
+    setEstado(prev => ({ ...prev, [id]: { ...prev[id], camisa: valor.replace(/\D/g, '') } }));
+  };
+
+  // Chamado no onBlur — detecta camisa duplicada e propõe troca
+  const verificarConflitoCamisa = (id: number) => {
+    const digitado = estado[id]?.camisa?.trim();
+    if (!digitado) return;
+
+    const nomeAtual = nomeCurto(jogadores.find(j => j.id_jogador === id)?.nome ?? '');
+
+    const conflito = jogadores.find(j => {
+      if (j.id_jogador === id) return false;
+      const st = estado[j.id_jogador];
+      return st?.presente && st.camisa === digitado;
+    });
+
+    if (!conflito) return;
+
+    const camisaDoConflito = estado[conflito.id_jogador]?.camisa || '';
+
+    Alert.alert(
+      `Camisa #${digitado} já em uso`,
+      `${nomeCurto(conflito.nome)} já usa essa camisa.\n\nDeseja trocar? ${nomeCurto(conflito.nome)} vai receber a camisa ${camisaDoConflito || 'nenhuma'} de ${nomeAtual}.`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+          onPress: () => setEstado(prev => ({ ...prev, [id]: { ...prev[id], camisa: '' } })),
+        },
+        {
+          text: 'Confirmar troca',
+          onPress: () => {
+            setEstado(prev => ({
+              ...prev,
+              [id]:                  { ...prev[id],                  camisa: digitado        },
+              [conflito.id_jogador]: { ...prev[conflito.id_jogador], camisa: camisaDoConflito },
+            }));
+          },
+        },
+      ],
+    );
   };
 
   // ── Selecionar / Desmarcar todos ───────────────────────────────────────────
@@ -231,11 +272,19 @@ export default function PrepararPartida({ partida, competicao, onFechar, onConfi
             </View>
           ) : (
             <TextInput
-              style={styles.camisaInput}
+              style={[
+                styles.camisaInput,
+                st.camisa && jogadores.some(o =>
+                  o.id_jogador !== j.id_jogador &&
+                  estado[o.id_jogador]?.presente &&
+                  estado[o.id_jogador]?.camisa === st.camisa
+                ) && { borderColor: '#f97316', color: '#f97316' },
+              ]}
               placeholder="#"
               placeholderTextColor="#555"
               value={st.camisa}
-              onChangeText={v => setCamisa(j.id_jogador, v.replace(/\D/g, ''))}
+              onChangeText={v => setCamisa(j.id_jogador, v)}
+              onBlur={() => verificarConflitoCamisa(j.id_jogador)}
               keyboardType="numeric"
               maxLength={2}
             />
